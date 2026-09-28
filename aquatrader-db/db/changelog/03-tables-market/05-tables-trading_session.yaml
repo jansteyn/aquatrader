@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: 05-trading_session-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS market.trading_session
+              (
+                  exchange_id         integer NOT NULL,
+                  session_date        date NOT NULL,
+
+                  open_time           timestamptz,
+                  close_time          timestamptz,
+
+                  is_trading_day      boolean NOT NULL DEFAULT true,
+
+                  PRIMARY KEY (
+                      exchange_id,
+                      session_date
+                  ),
+
+                  CONSTRAINT fk_trading_session_exchange
+                      FOREIGN KEY (exchange_id)
+                      REFERENCES market.exchange(id)
+              );
+            splitStatements: false

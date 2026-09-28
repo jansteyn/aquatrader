@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-application-log-table
+      author: migration
+      changes:
+        - sql:
+            sql: |
+              DROP TABLE IF EXISTS core.application_logs CASCADE;
+              
+              CREATE TABLE core.application_logs (
+                  id bigserial NOT NULL,
+                  log_level varchar(20) NOT NULL,
+                  log_message text NOT NULL,
+                  timestamp timestamptz DEFAULT now() NOT NULL,
+                  exception_text text NULL,
+                  source_context text NOT NULL,
+                  CONSTRAINT application_logs_pkey PRIMARY KEY (id)
+              );
+            splitStatements: false
+

@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-store_data_protection_keys-procedure
+      author: migration
+      changes:
+        - sql:
+            sql: |
+              DROP PROCEDURE IF EXISTS core.store_data_protection_keys;
+
+              CREATE OR REPLACE PROCEDURE core.store_data_protection_keys(
+                  _name text,
+                  _data text
+              )
+              LANGUAGE plpgsql
+              AS $$
+              BEGIN
+                insert into core.auth_data_protection_keys (name, data)
+                values (_name, _data)
+                on conflict (name) do update set data = excluded.data;
+              END;
+              $$;
+            splitStatements: false

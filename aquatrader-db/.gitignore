@@ -1,0 +1,30 @@
+# Liquibase generated files
+databasechangelog*.csv
+dbdocs/
+.liquibase/
+
+# Database backups
+*.sql.bak
+*.sql.backup
+
+# Environment-specific files
+liquibase.dev.yaml
+liquibase.prod.yaml
+liquibase.staging.yaml
+.env
+.env.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.jar
+*.exe

@@ -1,0 +1,84 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.get_listing_overview(
+                    _listing_id bigint
+                )
+                RETURNS TABLE
+                (
+                    listing_id        bigint,
+
+                    instrument_id     bigint,
+                    instrument_name   varchar(300),
+                    isin              varchar(12),
+                    instrument_type   varchar(30),
+
+                    symbol            varchar(50),
+
+                    exchange_id       integer,
+                    exchange_name     varchar(200),
+                    mic               varchar(4),
+
+                    currency_id       smallint,
+                    currency_code     varchar(3),
+                    currency_symbol   varchar(10),
+
+                    country_code      varchar(2),
+                    sector            varchar(150),
+                    industry          varchar(150),
+
+                    first_trade_date  date,
+                    last_trade_date   date,
+                    is_primary        boolean
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        l.id,
+
+                        i.id,
+                        i.name,
+                        i.isin,
+                        i.instrument_type,
+
+                        l.symbol,
+
+                        e.id,
+                        e.name,
+                        e.mic,
+
+                        c.id,
+                        c.code,
+                        c.symbol,
+
+                        i.country_of_origin,
+                        i.sector,
+                        i.industry,
+
+                        l.first_trade_date,
+                        l.last_trade_date,
+                        l.is_primary
+
+                    FROM market.listing l
+
+                    JOIN market.instrument i
+                        ON i.id = l.instrument_id
+
+                    JOIN market.exchange e
+                        ON e.id = l.exchange_id
+
+                    JOIN market.currency c
+                        ON c.id = l.currency_id
+
+                    WHERE l.id = _listing_id;
+                $$;
+                comment on function market.get_listing_overview is '
+                HTTP GET /api/listings/overview/{listingId}
+                @anonymous';
+            splitStatements: false

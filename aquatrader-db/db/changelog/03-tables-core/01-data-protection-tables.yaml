@@ -1,0 +1,12 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-data-protection-tables
+      author: migration
+      changes:
+        - sql:
+            sql: |
+              create table core.auth_data_protection_keys (
+                name text not null primary key,
+                data text not null
+              );
+            splitStatements: false

@@ -1,0 +1,46 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.search_instruments(
+                    _query      text,
+                    _page_size  integer DEFAULT 50
+                )
+                RETURNS TABLE
+                (
+                    id              bigint,
+                    isin            varchar(12),
+                    name            varchar(300),
+                    instrument_type varchar(30)
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        i.id,
+                        i.isin,
+                        i.name,
+                        i.instrument_type
+                    FROM market.instrument i
+                    WHERE i.is_active
+                    AND (
+                            i.name ILIKE '%' || _query || '%'
+                            OR i.isin ILIKE '%' || _query || '%'
+                        )
+                    ORDER BY
+                        CASE
+                            WHEN lower(i.name) = lower(_query) THEN 0
+                            WHEN lower(i.name) LIKE lower(_query) || '%' THEN 1
+                            ELSE 2
+                        END,
+                        i.name
+                    LIMIT GREATEST(_page_size, 1);
+                $$;
+                comment on function market.search_instruments is '
+                HTTP GET /api/instruments/search/query/{query}/pagesize/{pageSize}
+                @anonymous';
+            splitStatements: false

@@ -1,0 +1,18 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get_data_protection_keys-function
+      author: migration
+      changes:
+        - sql:
+            sql: |
+              DROP FUNCTION IF EXISTS core.get_data_protection_keys;
+              CREATE OR REPLACE FUNCTION core.get_data_protection_keys()
+              RETURNS SETOF text
+              LANGUAGE plpgsql
+              AS $$
+              BEGIN
+                RETURN QUERY
+                SELECT "data"::text FROM core.auth_data_protection_keys;
+              END;
+              $$;
+            splitStatements: false

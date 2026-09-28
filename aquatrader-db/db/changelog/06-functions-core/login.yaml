@@ -1,0 +1,49 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-user-login-function
+      author: migration
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                DROP FUNCTION IF EXISTS core.login;
+                
+                CREATE OR REPLACE FUNCTION core.login
+                (
+                    _scheme varchar(50),
+                    _username varchar(100),
+                    _password varchar(255)
+                )
+                RETURNS TABLE (
+                    scheme varchar(50),
+                    user_id bigint,
+                    organisation_id bigint,
+                    username varchar(100),
+                    roles text[],
+                    email varchar(255),
+                    password_hash text  -- NpgsqlRest verifies this automatically
+                )
+                LANGUAGE plpgsql
+                SET search_path = core, pg_catalog, pg_temp
+                AS $$
+                BEGIN
+                    RETURN QUERY
+                    SELECT
+                        _scheme,  -- Maps to the 'scheme' output column
+                        users.id,
+                        organisation_users.organisation_id,
+                        users.username,
+                        users.roles,
+                        users.email,
+                        users.password_hash
+                    FROM core.users
+                    JOIN core.organisation_users ON users.id = organisation_users.user_id
+                    WHERE users.username = _username;
+                END;
+                $$;
+                comment on function core.login is '
+                HTTP POST
+                @login
+                @sensitive
+                @anonymous';
+            splitStatements: false

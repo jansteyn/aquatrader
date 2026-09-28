@@ -1,0 +1,51 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-price_eod-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS prices.price_eod
+              (
+                  listing_id          bigint NOT NULL,
+                  price_date          date NOT NULL,
+
+                  open                numeric(20,8) NOT NULL,
+                  high                numeric(20,8) NOT NULL,
+                  low                 numeric(20,8) NOT NULL,
+                  close               numeric(20,8) NOT NULL,
+                  adjusted_close      numeric(20,8),
+
+                  volume              numeric(30,0),
+                  trade_count         bigint,
+
+                  PRIMARY KEY (listing_id, price_date),
+
+                  CONSTRAINT fk_price_eod_listing
+                      FOREIGN KEY (listing_id)
+                      REFERENCES market.listing(id),
+
+                  CONSTRAINT ck_price_eod_ohlc
+                      CHECK (
+                          high >= low
+                          AND high >= open
+                          AND high >= close
+                          AND low <= open
+                          AND low <= close
+                      ),
+
+                  CONSTRAINT ck_price_eod_positive
+                      CHECK (
+                          open > 0
+                          AND high > 0
+                          AND low > 0
+                          AND close > 0
+                      ),
+
+                  CONSTRAINT ck_price_eod_volume
+                      CHECK (
+                          volume IS NULL OR volume >= 0
+                      )
+              )
+              PARTITION BY RANGE (price_date);
+            splitStatements: false

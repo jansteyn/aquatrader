@@ -1,0 +1,30 @@
+databaseChangeLog:
+  - changeSet:
+      id: 02-exchange-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS market.exchange
+              (
+                  id              integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+
+                  name            varchar(200) NOT NULL,
+                  short_name      varchar(100),
+
+                  mic             varchar(4),
+                  operating_mic   varchar(4),
+
+                  country_code    varchar(2),
+                  timezone        varchar(100) NOT NULL,
+
+                  website         varchar(500),
+
+                  is_active       boolean NOT NULL DEFAULT true,
+
+                  created_at      timestamptz NOT NULL DEFAULT now(),
+                  updated_at      timestamptz NOT NULL DEFAULT now(),
+
+                  CONSTRAINT uq_exchange_mic UNIQUE (mic)
+              );
+            splitStatements: false

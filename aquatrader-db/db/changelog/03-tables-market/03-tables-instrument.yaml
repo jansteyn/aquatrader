@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: 03-instrument-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS market.instrument
+              (
+                  id                  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+
+                  isin                varchar(12),
+                  name                varchar(300) NOT NULL,
+
+                  instrument_type     varchar(30) NOT NULL,
+
+                  country_of_origin   varchar(2),
+
+                  sector              varchar(150),
+                  industry            varchar(150),
+
+                  is_active           boolean NOT NULL DEFAULT true,
+
+                  created_at          timestamptz NOT NULL DEFAULT now(),
+                  updated_at          timestamptz NOT NULL DEFAULT now(),
+
+                  CONSTRAINT uq_instrument_isin UNIQUE (isin)
+              );
+            splitStatements: false

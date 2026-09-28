@@ -1,0 +1,29 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-log_application-procedure
+      author: migration
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                DROP PROCEDURE IF EXISTS core.log_application;
+                CREATE OR REPLACE PROCEDURE core.log_application
+                (
+                    _log_level text,
+                    _log_message text,
+                    _timestamp timestamptz,
+                    _exception_text text,
+                    _source_context text
+                )
+                language plpgsql
+                set search_path = pg_catalog, pg_temp
+                as
+                $$
+                begin
+                    insert into core.application_logs (log_level, log_message, timestamp, exception_text, source_context)
+                    values (_log_level, _log_message,_timestamp, _exception_text, _source_context);
+
+                    raise notice 'Application log entry created: [%] %', _log_level, _log_message;
+                end;
+                $$;
+            splitStatements: false

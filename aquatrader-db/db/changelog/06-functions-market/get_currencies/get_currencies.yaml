@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.get_currencies()
+                RETURNS TABLE
+                (
+                    id              smallint,
+                    code            varchar(3),
+                    name            varchar(100),
+                    symbol          varchar(10),
+                    decimal_places  smallint,
+                    is_active       boolean
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        c.id,
+                        c.code,
+                        c.name,
+                        c.symbol,
+                        c.decimal_places,
+                        c.is_active
+                    FROM market.currency c
+                    WHERE c.is_active
+                    ORDER BY c.code;
+                $$;
+                comment on function market.get_currencies is '
+                HTTP GET /api/currencies
+                @anonymous';
+            splitStatements: false

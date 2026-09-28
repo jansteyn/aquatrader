@@ -1,0 +1,52 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION prices.get_latest_eod(
+                    _listing_id bigint
+                )
+                RETURNS TABLE
+                (
+                    listing_id      bigint,
+                    price_date      date,
+
+                    open            numeric(20,8),
+                    high            numeric(20,8),
+                    low             numeric(20,8),
+                    close           numeric(20,8),
+                    adjusted_close  numeric(20,8),
+
+                    volume          numeric(30,0),
+                    trade_count     bigint
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        p.listing_id,
+                        p.price_date,
+
+                        p.open,
+                        p.high,
+                        p.low,
+                        p.close,
+                        p.adjusted_close,
+
+                        p.volume,
+                        p.trade_count
+
+                    FROM prices.price_eod p
+
+                    WHERE p.listing_id = _listing_id
+
+                    ORDER BY p.price_date DESC
+                    LIMIT 1;
+                $$;
+                comment on function prices.get_latest_eod is '
+                HTTP GET /api/prices/eod/latest/{listingId}
+                @anonymous';
+            splitStatements: false

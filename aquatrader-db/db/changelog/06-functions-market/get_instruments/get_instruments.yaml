@@ -1,0 +1,45 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.get_instruments(
+                    _page       integer DEFAULT 1,
+                    _page_size  integer DEFAULT 50
+                )
+                RETURNS TABLE
+                (
+                    id                bigint,
+                    isin              varchar(12),
+                    name              varchar(300),
+                    instrument_type   varchar(30),
+                    country_of_origin varchar(2),
+                    sector            varchar(150),
+                    industry          varchar(150),
+                    is_active         boolean
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        i.id,
+                        i.isin,
+                        i.name,
+                        i.instrument_type,
+                        i.country_of_origin,
+                        i.sector,
+                        i.industry,
+                        i.is_active
+                    FROM market.instrument i
+                    WHERE i.is_active
+                    ORDER BY i.name
+                    LIMIT GREATEST(_page_size, 1)
+                    OFFSET GREATEST(_page - 1, 0) * GREATEST(_page_size, 1);
+                $$;
+                comment on function market.get_instruments is '
+                HTTP GET /api/instruments/page/{page}/pagesize/{page_size}
+                @anonymous';
+            splitStatements: false

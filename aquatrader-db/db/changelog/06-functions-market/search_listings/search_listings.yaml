@@ -1,0 +1,83 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.search_listings(
+                    _query      text,
+                    _page_size  integer DEFAULT 50
+                )
+                RETURNS TABLE
+                (
+                    listing_id       bigint,
+                    instrument_id    bigint,
+                    instrument_name  varchar(300),
+                    isin             varchar(12),
+
+                    symbol           varchar(50),
+
+                    exchange_id      integer,
+                    exchange_name    varchar(200),
+                    mic              varchar(4),
+
+                    currency_code    varchar(3),
+
+                    is_primary       boolean
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        l.id,
+                        l.instrument_id,
+                        i.name,
+                        i.isin,
+
+                        l.symbol,
+
+                        e.id,
+                        e.name,
+                        e.mic,
+
+                        c.code,
+
+                        l.is_primary
+
+                    FROM market.listing l
+
+                    JOIN market.instrument i
+                        ON i.id = l.instrument_id
+
+                    JOIN market.exchange e
+                        ON e.id = l.exchange_id
+
+                    JOIN market.currency c
+                        ON c.id = l.currency_id
+
+                    WHERE l.is_active
+                    AND i.is_active
+                    AND (
+                            l.symbol ILIKE _query || '%'
+                            OR i.name ILIKE '%' || _query || '%'
+                            OR i.isin ILIKE _query || '%'
+                        )
+
+                    ORDER BY
+                        CASE
+                            WHEN upper(l.symbol) = upper(_query) THEN 0
+                            WHEN upper(l.symbol) LIKE upper(_query) || '%' THEN 1
+                            WHEN upper(i.name) LIKE upper(_query) || '%' THEN 2
+                            ELSE 3
+                        END,
+                        i.name,
+                        l.symbol
+
+                    LIMIT GREATEST(_page_size, 1);
+                $$;
+                comment on function market.search_listings is '
+                HTTP GET /api/listings/search/query/{query}/pagesize/{pageSize}
+                @anonymous';
+            splitStatements: false

@@ -1,0 +1,32 @@
+databaseChangeLog:
+  - changeSet:
+      id: 04-indicator_output-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              create table technical.indicator_output
+              (
+                  indicator_output_id    smallint generated always as identity,
+
+                  indicator_id           smallint not null,
+
+                  output_index           smallint not null,
+
+                  code                   varchar(50) not null,
+                  name                   varchar(100) not null,
+
+                  constraint pk_indicator_output
+                      primary key (indicator_output_id),
+
+                  constraint fk_indicator_output_indicator
+                      foreign key (indicator_id)
+                      references technical.indicator (indicator_id),
+
+                  constraint uq_indicator_output_index
+                      unique (indicator_id, output_index),
+
+                  constraint uq_indicator_output_code
+                      unique (indicator_id, code)
+              );
+            splitStatements: false

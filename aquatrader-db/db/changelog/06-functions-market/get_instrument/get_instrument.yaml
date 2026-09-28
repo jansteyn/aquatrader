@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.get_instrument(
+                    _id bigint
+                )
+                RETURNS TABLE
+                (
+                    id                bigint,
+                    isin              varchar(12),
+                    name              varchar(300),
+                    instrument_type   varchar(30),
+                    country_of_origin varchar(2),
+                    sector            varchar(150),
+                    industry          varchar(150),
+                    is_active         boolean
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        i.id,
+                        i.isin,
+                        i.name,
+                        i.instrument_type,
+                        i.country_of_origin,
+                        i.sector,
+                        i.industry,
+                        i.is_active
+                    FROM market.instrument i
+                    WHERE i.id = _id;
+                $$;
+                comment on function market.get_instrument is '
+                HTTP GET /api/instruments/{id}
+                @anonymous';
+            splitStatements: false

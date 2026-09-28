@@ -1,0 +1,23 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-currency-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS market.currency
+              (
+                  id              smallint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+                  code            varchar(3) NOT NULL,
+                  name            varchar(100) NOT NULL,
+                  symbol          varchar(10),
+                  decimal_places  smallint NOT NULL DEFAULT 2,
+                  is_active       boolean NOT NULL DEFAULT true,
+
+                  CONSTRAINT uq_currency_code UNIQUE (code),
+                  CONSTRAINT ck_currency_code_upper
+                      CHECK (code = upper(code)),
+                  CONSTRAINT ck_currency_decimal_places
+                      CHECK (decimal_places BETWEEN 0 AND 8)
+              );
+            splitStatements: false

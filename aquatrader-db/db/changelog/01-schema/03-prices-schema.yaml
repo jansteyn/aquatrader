@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 03-prices-schema
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE SCHEMA prices AUTHORIZATION postgres;
+            splitStatements: false

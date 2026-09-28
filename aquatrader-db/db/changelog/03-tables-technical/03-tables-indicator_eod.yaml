@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: 03-indicator_eod-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS technical.indicator_eod
+              (
+                  listing_id                  bigint NOT NULL,
+                  price_date                  date NOT NULL,
+                  indicator_configuration_id  bigint NOT NULL,
+                  value_1                     double precision,
+                  value_2                     double precision,
+                  value_3                     double precision,
+                  value_4                     double precision,
+                  calculated_at               timestamptz not null default now(),
+
+                  PRIMARY KEY (listing_id, price_date, indicator_configuration_id),
+
+                  CONSTRAINT fk_indicator_eod_listing
+                      FOREIGN KEY (listing_id)
+                      REFERENCES market.listing(id),
+
+                  CONSTRAINT fk_indicator_eod_indicator_configuration
+                      FOREIGN KEY (indicator_configuration_id)
+                      REFERENCES technical.indicator_configuration(indicator_configuration_id)
+
+              )
+              PARTITION BY RANGE (price_date);
+            splitStatements: false

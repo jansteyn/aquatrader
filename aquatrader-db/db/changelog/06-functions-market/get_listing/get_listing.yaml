@@ -1,0 +1,80 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.get_listing(
+                    _id bigint
+                )
+                RETURNS TABLE
+                (
+                    id               bigint,
+                    instrument_id    bigint,
+                    instrument_name  varchar(300),
+                    isin             varchar(12),
+
+                    exchange_id      integer,
+                    exchange_name    varchar(200),
+                    mic              varchar(4),
+
+                    currency_id      smallint,
+                    currency_code    varchar(3),
+
+                    symbol           varchar(50),
+                    local_symbol     varchar(50),
+
+                    listing_type     varchar(30),
+
+                    first_trade_date date,
+                    last_trade_date  date,
+
+                    is_primary       boolean,
+                    is_active        boolean
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        l.id,
+                        l.instrument_id,
+                        i.name,
+                        i.isin,
+
+                        l.exchange_id,
+                        e.name,
+                        e.mic,
+
+                        l.currency_id,
+                        c.code,
+
+                        l.symbol,
+                        l.local_symbol,
+
+                        l.listing_type,
+
+                        l.first_trade_date,
+                        l.last_trade_date,
+
+                        l.is_primary,
+                        l.is_active
+
+                    FROM market.listing l
+
+                    JOIN market.instrument i
+                        ON i.id = l.instrument_id
+
+                    JOIN market.exchange e
+                        ON e.id = l.exchange_id
+
+                    JOIN market.currency c
+                        ON c.id = l.currency_id
+
+                    WHERE l.id = _id;
+                $$;
+                comment on function market.get_listing is '
+                HTTP GET /api/listings/{id}
+                @anonymous';
+            splitStatements: false

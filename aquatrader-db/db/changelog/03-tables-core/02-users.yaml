@@ -1,0 +1,31 @@
+databaseChangeLog:
+  - changeSet:
+      id: 02-create-users-table
+      author: migration
+      changes:
+        - sql:
+            sql: |
+              DROP TABLE IF EXISTS core.users CASCADE;
+              
+              CREATE TABLE core.users (
+                id bigint primary key generated always as identity,
+                username varchar(100) not null,
+                full_name varchar(255) null,
+                billing_address text null,
+                email varchar(255) not null,
+                email_confirmed bool DEFAULT false NOT NULL,
+                roles text[] not null,
+                password_hash text null,
+                phone_number varchar(20) NULL,
+                phone_number_confirmed bool DEFAULT false NOT NULL,
+                last_login timestamp with time zone null,
+                last_login_provider text null,
+                two_factor_enabled bool DEFAULT false NOT NULL,
+                lockout_end timestamptz NULL,
+                lockout_enabled bool DEFAULT true NOT NULL,
+                access_failed_count int4 default 0 NOT NULL,
+                created_via text null,
+                created_at timestamp DEFAULT now() NOT NULL,
+              	CONSTRAINT users_username_key UNIQUE (username)
+              );
+            splitStatements: false

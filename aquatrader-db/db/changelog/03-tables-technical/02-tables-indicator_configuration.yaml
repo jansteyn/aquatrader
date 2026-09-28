@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 02-indicator_configuration-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              create table technical.indicator_configuration
+              (
+                  indicator_configuration_id bigint generated always as identity,
+                  indicator_id               smallint not null,
+                  parameters                 jsonb not null,
+                  parameters_hash            bytea not null,
+                  created_at                 timestamptz not null default now(),
+
+                  constraint pk_indicator_configuration
+                      primary key (indicator_configuration_id),
+
+                  constraint fk_indicator_configuration_indicator
+                      foreign key (indicator_id)
+                      references technical.indicator (indicator_id),
+
+                  constraint uq_indicator_configuration
+                      unique (indicator_id, parameters_hash)
+              );
+            splitStatements: false

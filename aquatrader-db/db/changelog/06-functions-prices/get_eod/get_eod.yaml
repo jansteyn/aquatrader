@@ -1,0 +1,49 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION prices.get_eod(
+                    _listing_id bigint,
+                    _from_date  date,
+                    _to_date    date
+                )
+                RETURNS TABLE
+                (
+                    price_date      date,
+                    open            numeric(20,8),
+                    high            numeric(20,8),
+                    low             numeric(20,8),
+                    close           numeric(20,8),
+                    adjusted_close  numeric(20,8),
+                    volume          numeric(30,0),
+                    trade_count     bigint
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        p.price_date,
+                        p.open,
+                        p.high,
+                        p.low,
+                        p.close,
+                        p.adjusted_close,
+                        p.volume,
+                        p.trade_count
+
+                    FROM prices.price_eod p
+
+                    WHERE p.listing_id = _listing_id
+                    AND p.price_date >= _from_date
+                    AND p.price_date <= _to_date
+
+                    ORDER BY p.price_date;
+                $$;
+                comment on function prices.get_eod is '
+                HTTP GET /api/prices/eod/{listingId}/{fromDate}/{toDate}
+                @anonymous';
+            splitStatements: false

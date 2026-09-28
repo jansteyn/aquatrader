@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.get_trading_sessions(
+                    _exchange_id integer,
+                    _from_date  date,
+                    _to_date    date
+                )
+                RETURNS TABLE
+                (
+                    session_date date,
+                    open_time    timestamptz,
+                    close_time   timestamptz,
+                    is_trading_day boolean
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        t.session_date,
+                        t.open_time,
+                        t.close_time,
+                        t.is_trading_day
+
+                    FROM market.trading_session t
+
+                    WHERE t.exchange_id = _exchange_id
+                    AND t.session_date >= _from_date
+                    AND t.session_date <= _to_date
+
+                    ORDER BY t.session_date;
+                $$;
+                comment on function market.get_trading_sessions is '
+                HTTP GET /api/exchanges/trading-sessions/{exchange_id}/{from_date}/{to_date}
+                @anonymous';
+            splitStatements: false

@@ -1,0 +1,6 @@
+FROM docker.io/vbilopav/npgsqlrest:latest-jit AS base
+WORKDIR /app
+EXPOSE 5000
+COPY ["npgsqlrest/appsettings.json", "."]
+
+ENTRYPOINT ["dotnet", "NpgsqlRestClient.dll"]

@@ -1,0 +1,51 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION prices.get_latest_market_snapshot(
+                    _listing_ids bigint[]
+                )
+                RETURNS TABLE
+                (
+                    listing_id      bigint,
+                    price_date      date,
+
+                    open            numeric(20,8),
+                    high            numeric(20,8),
+                    low             numeric(20,8),
+                    close           numeric(20,8),
+                    adjusted_close  numeric(20,8),
+
+                    volume          numeric(30,0)
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT DISTINCT ON (p.listing_id)
+                        p.listing_id,
+                        p.price_date,
+
+                        p.open,
+                        p.high,
+                        p.low,
+                        p.close,
+                        p.adjusted_close,
+
+                        p.volume
+
+                    FROM prices.price_eod p
+
+                    WHERE p.listing_id = ANY(_listing_ids)
+
+                    ORDER BY
+                        p.listing_id,
+                        p.price_date DESC;
+                $$;
+                comment on function prices.get_latest_market_snapshot is '
+                HTTP GET /api/prices/market-snapshot/listing_ids/{listing_ids}
+                @anonymous';
+            splitStatements: false

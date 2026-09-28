@@ -1,0 +1,49 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION prices.get_fx_eod(
+                    _base_currency  varchar(3),
+                    _quote_currency varchar(3),
+                    _from_date      date,
+                    _to_date        date
+                )
+                RETURNS TABLE
+                (
+                    price_date date,
+                    base_currency varchar(3),
+                    quote_currency varchar(3),
+                    rate numeric(20,10)
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        f.price_date,
+                        base.code,
+                        quote.code,
+                        f.rate
+
+                    FROM prices.fx_rate_eod f
+
+                    JOIN market.currency base
+                        ON base.id = f.base_currency_id
+
+                    JOIN market.currency quote
+                        ON quote.id = f.quote_currency_id
+
+                    WHERE base.code = upper(_base_currency)
+                    AND quote.code = upper(_quote_currency)
+                    AND f.price_date >= _from_date
+                    AND f.price_date <= _to_date
+
+                    ORDER BY f.price_date;
+                $$;
+                comment on function prices.get_fx_eod is '
+                HTTP GET /api/prices/fx/eod/{baseCurrency}/{quoteCurrency}/{fromDate}/{toDate}
+                @anonymous';
+            splitStatements: false

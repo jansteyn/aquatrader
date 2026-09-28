@@ -1,0 +1,54 @@
+databaseChangeLog:
+  - changeSet:
+      id: 04-listing-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS market.listing
+              (
+                  id                  bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+
+                  instrument_id       bigint NOT NULL,
+                  exchange_id         integer NOT NULL,
+                  currency_id         smallint NOT NULL,
+
+                  symbol              varchar(50) NOT NULL,
+                  local_symbol        varchar(50),
+
+                  name                varchar(300),
+
+                  listing_type        varchar(30),
+
+                  first_trade_date    date,
+                  last_trade_date     date,
+
+                  is_primary          boolean NOT NULL DEFAULT false,
+                  is_active           boolean NOT NULL DEFAULT true,
+
+                  created_at          timestamptz NOT NULL DEFAULT now(),
+                  updated_at          timestamptz NOT NULL DEFAULT now(),
+
+                  CONSTRAINT fk_listing_instrument
+                      FOREIGN KEY (instrument_id)
+                      REFERENCES market.instrument(id),
+
+                  CONSTRAINT fk_listing_exchange
+                      FOREIGN KEY (exchange_id)
+                      REFERENCES market.exchange(id),
+
+                  CONSTRAINT fk_listing_currency
+                      FOREIGN KEY (currency_id)
+                      REFERENCES market.currency(id),
+
+                  CONSTRAINT uq_listing_exchange_symbol
+                      UNIQUE (exchange_id, symbol),
+
+                  CONSTRAINT ck_listing_dates
+                      CHECK (
+                          last_trade_date IS NULL
+                          OR first_trade_date IS NULL
+                          OR last_trade_date >= first_trade_date
+                      )
+              );
+            splitStatements: false

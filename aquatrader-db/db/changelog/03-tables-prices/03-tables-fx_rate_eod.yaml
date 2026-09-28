@@ -1,0 +1,36 @@
+databaseChangeLog:
+  - changeSet:
+      id: 03-fx_rate_eod-tables
+      author: jan
+      changes:
+        - sql:
+            sql: |
+                CREATE TABLE IF NOT EXISTS prices.fx_rate_eod
+                (
+                    base_currency_id     smallint NOT NULL,
+                    quote_currency_id    smallint NOT NULL,
+                    price_date           date NOT NULL,
+
+                    rate                 numeric(20,10) NOT NULL,
+
+                    PRIMARY KEY (
+                        base_currency_id,
+                        quote_currency_id,
+                        price_date
+                    ),
+
+                    CONSTRAINT fk_fx_base_currency
+                        FOREIGN KEY (base_currency_id)
+                        REFERENCES market.currency(id),
+
+                    CONSTRAINT fk_fx_quote_currency
+                        FOREIGN KEY (quote_currency_id)
+                        REFERENCES market.currency(id),
+
+                    CONSTRAINT ck_fx_different_currency
+                        CHECK (base_currency_id <> quote_currency_id),
+
+                    CONSTRAINT ck_fx_positive
+                        CHECK (rate > 0)
+                );
+            splitStatements: false

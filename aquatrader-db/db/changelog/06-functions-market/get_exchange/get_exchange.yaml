@@ -1,0 +1,43 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get-currencies-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                CREATE OR REPLACE FUNCTION market.get_exchange(
+                    _id integer
+                )
+                RETURNS TABLE
+                (
+                    id              integer,
+                    name            varchar(200),
+                    short_name      varchar(100),
+                    mic             varchar(4),
+                    operating_mic   varchar(4),
+                    country_code    varchar(2),
+                    timezone        varchar(100),
+                    website         varchar(500),
+                    is_active       boolean
+                )
+                LANGUAGE sql
+                STABLE
+                AS $$
+                    SELECT
+                        e.id,
+                        e.name,
+                        e.short_name,
+                        e.mic,
+                        e.operating_mic,
+                        e.country_code,
+                        e.timezone,
+                        e.website,
+                        e.is_active
+                    FROM market.exchange e
+                    WHERE e.id = _id;
+                $$;
+                comment on function market.get_exchange is '
+                HTTP GET /api/exchanges/{id}
+                @anonymous';
+            splitStatements: false

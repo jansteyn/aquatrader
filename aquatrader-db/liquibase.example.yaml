@@ -1,0 +1,58 @@
+# Liquibase Configuration - Example
+
+# Database Connection
+liquibase:
+  # Database driver class
+  driver: org.postgresql.Driver
+  
+  # JDBC connection URL
+  # Format: jdbc:postgresql://[host]:[port]/[database]
+  url: jdbc:postgresql://localhost:5432/aquatrader
+  
+  # Database username
+  username: postgres
+  
+  # Database password (or use DB_PASSWORD environment variable)
+  password: ${DB_PASSWORD}
+  
+  # Default schema to use
+  defaultSchemaName: aquatrader
+  
+  # Path to the main changelog file
+  changeLog: db/changelog/master.yaml
+  
+  # Classpath for Liquibase
+  classpath: ./db/changelog
+  
+  # Logging level: DEBUG, INFO, WARNING, SEVERE
+  logLevel: info
+  
+  # Whether to validate the changelog before running
+  validate: true
+  
+  # Contexts to execute (optional - can filter changesets by context)
+  # contexts: production
+  
+  # Labels to execute (optional - can filter changesets by label)
+  # labels: release-1.0
+
+# For Maven integration, add to pom.xml:
+# <plugin>
+#   <groupId>org.liquibase</groupId>
+#   <artifactId>liquibase-maven-plugin</artifactId>
+#   <version>4.25.0</version>
+#   <configuration>
+#     <driver>org.postgresql.Driver</driver>
+#     <url>jdbc:postgresql://localhost:5432/aquatrader</url>
+#     <username>postgres</username>
+#     <password>${db.password}</password>
+#     <changeLogFile>db/changelog/master.yaml</changeLogFile>
+#   </configuration>
+#   <dependencies>
+#     <dependency>
+#       <groupId>org.postgresql</groupId>
+#       <artifactId>postgresql</artifactId>
+#       <version>42.7.0</version>
+#     </dependency>
+#   </dependencies>
+# </plugin>

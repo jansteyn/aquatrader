@@ -1,0 +1,52 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-external_login-function
+      author: migration
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                DROP FUNCTION IF EXISTS core.external_login;
+                CREATE OR REPLACE FUNCTION core.external_login(
+                    _provider text,
+                    _email text,
+                    _name text,
+                    _data jsonb,
+                    _analytics jsonb
+                )
+                returns table(
+                    status boolean, 
+                    user_id bigint, 
+                    username text, 
+                    email text, 
+                    roles text[], 
+                    provider text)
+                language plpgsql as $$
+                declare
+                    _user_id bigint;
+                begin
+                    -- Find or create user
+                    select i.id into _user_id from core.users i where i.email = _email;
+
+                    if _user_id is null then
+                        insert into core.users (email, username, full_name, roles, created_via, lockout_enabled)
+                        values (_email, _name, _name, ARRAY['user'], _provider, false)
+                        returning id into _user_id;
+                    end if;
+
+                    -- Return claims (same format as login endpoint)
+                    return query
+                       
+                    select
+                        true as status,
+                        u.id as user_id,
+                        u.username,
+                        u.roles,
+                        u.email,
+                        _provider as provider
+                    from core.users u
+                    where
+                        u.id = _user_id;
+                end;
+                $$;
+            splitStatements: false

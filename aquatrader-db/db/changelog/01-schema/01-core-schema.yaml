@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-core-schema
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE SCHEMA core AUTHORIZATION postgres;
+            splitStatements: false

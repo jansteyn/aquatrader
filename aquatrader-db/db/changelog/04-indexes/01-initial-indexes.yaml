@@ -1,0 +1,22 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-initial-indexes
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE INDEX ix_price_eod_date
+                  ON prices.price_eod (price_date);
+
+              CREATE INDEX ix_price_intraday_time
+                  ON prices.price_intraday (price_time);
+
+              CREATE INDEX ix_listing_instrument
+                  ON market.listing (instrument_id);
+
+              CREATE INDEX ix_listing_exchange
+                  ON market.listing (exchange_id);
+
+              CREATE INDEX ix_listing_symbol
+                  ON market.listing (symbol);
+            splitStatements: false
