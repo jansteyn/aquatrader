@@ -1,0 +1,58 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get_latest_indicator_values-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+              create or replace function technical.get_latest_indicator_values(
+                  _listing_id bigint,
+                  _indicator_configuration_ids bigint[] default null
+              )
+              returns table
+              (
+                  price_date date,
+                  indicator_configuration_id bigint,
+                  indicator_code varchar,
+                  indicator_name varchar,
+                  parameters jsonb,
+                  value_1 double precision,
+                  value_2 double precision,
+                  value_3 double precision,
+                  value_4 double precision
+              )
+              language sql
+              stable
+              as $$
+                  select distinct on (ie.indicator_configuration_id)
+                      ie.price_date,
+                      ie.indicator_configuration_id,
+                      i.code,
+                      i.name,
+                      ic.parameters,
+                      ie.value_1,
+                      ie.value_2,
+                      ie.value_3,
+                      ie.value_4
+                  from technical.indicator_eod ie
+                  join technical.indicator_configuration ic
+                      on ic.indicator_configuration_id =
+                        ie.indicator_configuration_id
+                  join technical.indicator i
+                      on i.indicator_id = ic.indicator_id
+                  where ie.listing_id = _listing_id
+                    and (
+                        _indicator_configuration_ids is null
+                        or ie.indicator_configuration_id =
+                          any(_indicator_configuration_ids)
+                    )
+                  order by
+                      ie.indicator_configuration_id,
+                      ie.price_date desc;
+              $$;
+              comment on function technical.get_latest_indicator_values is '
+              HTTP GET /api/technical/latestindicatorvalues/{listingId}/{indicatorConfigurationIds}
+              @anonymous';
+
+            splitStatements: false

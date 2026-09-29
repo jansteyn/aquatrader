@@ -1,6 +1,6 @@
 databaseChangeLog:
   - changeSet:
-      id: create-get-currencies-function
+      id: create-get-latest-market-snapshot-function
       author: jan
       runOnChange: true
       changes:

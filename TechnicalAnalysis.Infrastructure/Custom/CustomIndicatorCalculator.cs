@@ -8,7 +8,7 @@ namespace TechnicalAnalysis.Infrastructure.Custom;
 public class CustomIndicatorCalculator 
     : IProviderIndicatorCalculator
 {
-	private const string providerName = "FacioQuo";
+	private const string providerName = "custom";
 	public string ProviderName => providerName;
 
 	public Task<IndicatorCalculationResult> CalculateAsync(

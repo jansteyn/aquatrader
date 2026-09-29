@@ -1,6 +1,6 @@
 databaseChangeLog:
   - changeSet:
-      id: create-get-currencies-function
+      id: create-get-instruments-function
       author: jan
       runOnChange: true
       changes:

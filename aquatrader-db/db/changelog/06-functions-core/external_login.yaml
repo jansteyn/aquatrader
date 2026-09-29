@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: create-external_login-function
-      author: migration
+      author: jan
       runOnChange: true
       changes:
         - sql:

@@ -1,0 +1,41 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get_indicator_eod-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                create or replace function technical.get_indicator_eod(
+                    _listing_id bigint,
+                    _indicator_configuration_id bigint,
+                    _from_date date,
+                    _to_date date
+                )
+                returns table
+                (
+                    price_date date,
+                    value_1 double precision,
+                    value_2 double precision,
+                    value_3 double precision,
+                    value_4 double precision
+                )
+                language sql
+                stable
+                as $$
+                    select
+                        ie.price_date,
+                        ie.value_1,
+                        ie.value_2,
+                        ie.value_3,
+                        ie.value_4
+                    from technical.indicator_eod ie
+                    where ie.listing_id = _listing_id
+                    and ie.indicator_configuration_id = _indicator_configuration_id
+                    and ie.price_date between _from_date and _to_date
+                    order by ie.price_date;
+                $$;
+                comment on function technical.get_indicator_eod is '
+                HTTP GET /api/technical/indicatoreod/{listingId}/{indicatorConfigurationId}/{fromDate}/{toDate}
+                @anonymous';
+            splitStatements: false

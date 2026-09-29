@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: create-user-profile-function
-      author: migration
+      author: jan
       runOnChange: true
       changes:
         - sql:

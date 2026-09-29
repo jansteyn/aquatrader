@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: 01-data-protection-tables
-      author: migration
+      author: jan
       changes:
         - sql:
             sql: |

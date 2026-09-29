@@ -1,0 +1,42 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get_indicator_configurations-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+              create or replace function technical.get_indicator_configurations(
+                  _indicator_id smallint default null
+              )
+              returns table
+              (
+                  indicator_configuration_id bigint,
+                  indicator_id smallint,
+                  indicator_code varchar,
+                  indicator_name varchar,
+                  parameters jsonb
+              )
+              language sql
+              stable
+              as $$
+                  select
+                      ic.indicator_configuration_id,
+                      i.indicator_id,
+                      i.code,
+                      i.name,
+                      ic.parameters
+                  from technical.indicator_configuration ic
+                  join technical.indicator i
+                      on i.indicator_id = ic.indicator_id
+                  where _indicator_id is null
+                    or i.indicator_id = _indicator_id
+                  order by
+                      i.name,
+                      ic.indicator_configuration_id;
+              $$;
+                comment on function technical.get_indicator_configurations is '
+                HTTP GET /api/technical/indicatorconfigurations/{indicatorId}
+                @anonymous';
+
+            splitStatements: false

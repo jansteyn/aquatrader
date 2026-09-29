@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: create-register_user-function
-      author: migration
+      author: jan
       runOnChange: true
       changes:
         - sql:

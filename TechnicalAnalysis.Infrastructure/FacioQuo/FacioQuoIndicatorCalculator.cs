@@ -8,17 +8,11 @@ using TechnicalAnalysis.Infrastructure.FacioQuo.Abstractions;
 
 namespace TechnicalAnalysis.Infrastructure.FacioQuo;
 
-public sealed class FacioQuoIndicatorCalculator
-	: IProviderIndicatorCalculator
+public sealed class FacioQuoIndicatorCalculator(IKeyedServiceProvider keyedServiceProvider)
+        : IProviderIndicatorCalculator
 {
-	private readonly IKeyedServiceProvider _keyedServiceProvider;
-
-	public FacioQuoIndicatorCalculator(IKeyedServiceProvider keyedServiceProvider)
-	{
-		_keyedServiceProvider = keyedServiceProvider;
-	}
-
-	private const string providerName = "FacioQuo";
+	private readonly IKeyedServiceProvider _keyedServiceProvider = keyedServiceProvider;
+    private const string providerName = "facioquo";
 	public string ProviderName => providerName;
 
 	public Task<IndicatorCalculationResult> CalculateAsync(

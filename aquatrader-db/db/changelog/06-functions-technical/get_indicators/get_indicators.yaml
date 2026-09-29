@@ -1,0 +1,35 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get_indicators-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+              create or replace function technical.get_indicators()
+              returns table
+              (
+                  indicator_id smallint,
+                  code varchar,
+                  name varchar,
+                  description text,
+                  output_count smallint
+              )
+              language sql
+              stable
+              as $$
+                  select
+                      i.indicator_id,
+                      i.code,
+                      i.name,
+                      i.description,
+                      i.output_count
+                  from technical.indicator i
+                  where i.is_active
+                  order by i.name;
+              $$;
+              comment on function technical.get_indicators is '
+              HTTP GET /api/technical/indicators
+              @anonymous';
+
+            splitStatements: false

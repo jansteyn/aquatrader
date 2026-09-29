@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: create-get_data_protection_keys-function
-      author: migration
+      author: jan
       changes:
         - sql:
             sql: |

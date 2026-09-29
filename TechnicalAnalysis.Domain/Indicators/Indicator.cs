@@ -14,6 +14,8 @@ public sealed class Indicator
 
 	public string? Description { get; init; }
 
+	public required string ProviderName { get; init; }
+
 	public required short OutputCount { get; init; }
 
 	public bool IsActive { get; init; } = true;

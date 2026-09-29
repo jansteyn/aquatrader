@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: create-application-log-table
-      author: migration
+      author: jan
       changes:
         - sql:
             sql: |

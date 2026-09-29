@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: create-store_data_protection_keys-procedure
-      author: migration
+      author: jan
       changes:
         - sql:
             sql: |

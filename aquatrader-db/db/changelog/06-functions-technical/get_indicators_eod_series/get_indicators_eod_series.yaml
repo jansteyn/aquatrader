@@ -1,0 +1,58 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-get_indicators_eod_series-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+              create or replace function technical.get_indicators_eod_series(
+                  _listing_id bigint,
+                  _indicator_configuration_ids bigint[],
+                  _from_date date,
+                  _to_date date
+              )
+              returns table
+              (
+                  price_date date,
+                  indicator_configuration_id bigint,
+                  indicator_code varchar,
+                  indicator_name varchar,
+                  parameters jsonb,
+                  value_1 double precision,
+                  value_2 double precision,
+                  value_3 double precision,
+                  value_4 double precision
+              )
+              language sql
+              stable
+              as $$
+                  select
+                      ie.price_date,
+                      ie.indicator_configuration_id,
+                      i.code,
+                      i.name,
+                      ic.parameters,
+                      ie.value_1,
+                      ie.value_2,
+                      ie.value_3,
+                      ie.value_4
+                  from technical.indicator_eod ie
+                  join technical.indicator_configuration ic
+                      on ic.indicator_configuration_id =
+                        ie.indicator_configuration_id
+                  join technical.indicator i
+                      on i.indicator_id = ic.indicator_id
+                  where ie.listing_id = _listing_id
+                    and ie.indicator_configuration_id =
+                        any(_indicator_configuration_ids)
+                    and ie.price_date between _from_date and _to_date
+                  order by
+                      ie.price_date,
+                      ie.indicator_configuration_id;
+              $$;
+              comment on function technical.get_indicators_eod_series is '
+              HTTP GET /api/technical/indicatorseodseries/{listingId}/{indicatorConfigurationIds}/{fromDate}/{toDate}
+              @anonymous';
+
+            splitStatements: false

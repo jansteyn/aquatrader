@@ -8,20 +8,13 @@ databaseChangeLog:
               create table technical.indicator_calculation_run
               (
                   calculation_run_id       bigint generated always as identity,
-
                   calculation_date         date not null,
-
                   indicator_configuration_id bigint not null,
-
                   started_at                timestamptz not null,
                   completed_at              timestamptz,
-
                   library_version           varchar(30) not null,
-
                   status                    varchar(20) not null,
-
                   rows_calculated           bigint not null default 0,
-
                   error_message             text
               );
             splitStatements: false

@@ -8,11 +8,8 @@ databaseChangeLog:
               create table technical.indicator_output
               (
                   indicator_output_id    smallint generated always as identity,
-
                   indicator_id           smallint not null,
-
                   output_index           smallint not null,
-
                   code                   varchar(50) not null,
                   name                   varchar(100) not null,
 

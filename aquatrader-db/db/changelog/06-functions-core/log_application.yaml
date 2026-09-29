@@ -1,7 +1,7 @@
 databaseChangeLog:
   - changeSet:
       id: create-log_application-procedure
-      author: migration
+      author: jan
       runOnChange: true
       changes:
         - sql:

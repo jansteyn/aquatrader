@@ -26,6 +26,7 @@ public sealed class IndicatorRepository
                 code,
                 name,
                 description,
+                provider_name,
                 output_count,
                 is_active
             from technical.indicator
@@ -57,8 +58,9 @@ public sealed class IndicatorRepository
 			Description = reader.IsDBNull(3)
 				? null
 				: reader.GetString(3),
-			OutputCount = reader.GetInt16(4),
-			IsActive = reader.GetBoolean(5)
+			ProviderName = reader.GetString(4),
+			OutputCount = reader.GetInt16(5),
+			IsActive = reader.GetBoolean(6)
 		};
 	}
 
