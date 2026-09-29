@@ -15,6 +15,9 @@ databaseChangeLog:
       path: "03-tables-technical/"
       relativeToChangelogFile: true
   - includeAll:
+      path: "04-indexes-technical/"
+      relativeToChangelogFile: true
+  - includeAll:
       path: "04-indexes/"
       relativeToChangelogFile: true
   - includeAll:

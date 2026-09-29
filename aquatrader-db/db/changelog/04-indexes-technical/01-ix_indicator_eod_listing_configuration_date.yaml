@@ -1,0 +1,15 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-ix_indicator_eod_listing_configuration_date-indexes
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              create index if not exists ix_indicator_eod_listing_configuration_date
+                  on technical.indicator_eod
+                  (
+                      listing_id,
+                      indicator_configuration_id,
+                      price_date
+                  );
+            splitStatements: false
