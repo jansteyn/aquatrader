@@ -4,6 +4,7 @@ using TechnicalAnalysis.Domain.Repositories;
 using TechnicalAnalysis.Infrastructure.FacioQuo.Abstractions;
 using TechnicalAnalysis.Infrastructure.FacioQuo;
 using TechnicalAnalysis.Infrastructure.PostgreSql;
+using TechnicalAnalysis.Infrastructure.Custom;
 
 namespace TechnicalAnalysis.Infrastructure;
 
@@ -45,6 +46,14 @@ public static class DependencyInjection
 				calculator.Code,
 				calculatorType);
 		}
+
+		services.AddKeyedScoped<
+			IProviderIndicatorCalculator,
+			FacioQuoIndicatorCalculator>(FacioQuoIndicatorCalculator.ProviderName);
+
+		services.AddKeyedScoped<
+			IProviderIndicatorCalculator,
+			CustomIndicatorCalculator>(CustomIndicatorCalculator.ProviderName);
 
 		return services;
 	}

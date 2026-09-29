@@ -13,7 +13,7 @@ public sealed class FacioQuoIndicatorCalculator(IKeyedServiceProvider keyedServi
 {
 	private readonly IKeyedServiceProvider _keyedServiceProvider = keyedServiceProvider;
     private const string providerName = "facioquo";
-	public string ProviderName => providerName;
+	public static string ProviderName => providerName;
 
 	public Task<IndicatorCalculationResult> CalculateAsync(
 		string indicatorCode,

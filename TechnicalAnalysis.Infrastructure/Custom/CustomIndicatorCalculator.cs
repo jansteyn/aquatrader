@@ -9,7 +9,7 @@ public class CustomIndicatorCalculator
     : IProviderIndicatorCalculator
 {
 	private const string providerName = "custom";
-	public string ProviderName => providerName;
+	public static string ProviderName => providerName;
 
 	public Task<IndicatorCalculationResult> CalculateAsync(
 		string indicatorCode,

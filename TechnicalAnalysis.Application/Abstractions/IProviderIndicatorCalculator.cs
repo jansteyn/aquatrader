@@ -5,7 +5,8 @@ namespace TechnicalAnalysis.Application.Abstractions;
 
 public interface IProviderIndicatorCalculator
 {
-	public string ProviderName { get; }
+	private const string providerName = "interface";
+	public static string ProviderName => providerName;
 	Task<IndicatorCalculationResult> CalculateAsync(
 		string indicatorCode,
 		long indicatorConfigurationId,
