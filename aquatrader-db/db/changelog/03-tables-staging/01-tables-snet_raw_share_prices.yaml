@@ -1,0 +1,51 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-tables-snet_raw_share_prices
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE staging.snet_raw_share_prices (
+                  id BIGSERIAL PRIMARY KEY,
+                  
+                  -- Identification & Classification
+                  dn_name VARCHAR(100),
+                  full_name VARCHAR(255),
+                  code VARCHAR(20),
+                  isin CHAR(12),
+                  exchange VARCHAR(20),
+                  dnsector VARCHAR(100),
+                  exchange_sector VARCHAR(100),
+                  ami_sector VARCHAR(100),
+                  
+                  -- Daily Price Data
+                  -- Using DATE type. If your raw CSV has format 'YYYYMMDD', Postgres can parse it automatically.
+                  date DATE NOT NULL,
+                  open NUMERIC(15, 4),
+                  high NUMERIC(15, 4),
+                  low NUMERIC(15, 4),
+                  close NUMERIC(15, 4),
+                  bid NUMERIC(15, 4),
+                  offer NUMERIC(15, 4),
+                  currency VARCHAR(10),
+                  
+                  -- Volume & Activity Metrics
+                  volume BIGINT,
+                  value NUMERIC(18, 4),
+                  deals INTEGER,
+                  oi INTEGER, -- Open Interest for derivatives
+                  
+                  -- Valuation & Structural Data
+                  dy NUMERIC(6, 3), -- E.g., 12.345%
+                  ey NUMERIC(6, 3), -- E.g., 15.678%
+                  issued_shares BIGINT,
+                  
+                  -- Metadata for auditing/parsing
+                  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+              );
+
+              -- Performance Indexes for your staging queries
+              CREATE INDEX idx_raw_prices_date ON staging.snet_raw_share_prices(date);
+              CREATE INDEX idx_raw_prices_code ON staging.snet_raw_share_prices(code);
+              CREATE UNIQUE INDEX idx_raw_prices_unique_ticker_date ON staging.snet_raw_share_prices(code, date, exchange);
+            splitStatements: false

@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: csv_upload-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+              create or replace procedure staging.process_snet_staging_import()
+              language plpgsql
+              as $$
+              begin
+                -- Example: Inserting into a clean 'companies' dimensions table
+                INSERT INTO production.companies (ticker, isin, company_name, industry)
+                SELECT DISTINCT code, isin, full_name, exchange_sector
+                FROM raw_share_prices
+                ON CONFLICT (ticker) DO NOTHING;
+
+                -- Example: Inserting into a clean 'daily_quotes' facts table
+                INSERT INTO production.daily_quotes (company_id, trading_date, close_price, volume)
+                SELECT c.id, r.date, r.close, r.volume
+                FROM raw_share_prices r
+                JOIN production.companies c ON c.ticker = r.code
+                ON CONFLICT (company_id, trading_date) DO UPDATE
+
+              end;
+              $$;

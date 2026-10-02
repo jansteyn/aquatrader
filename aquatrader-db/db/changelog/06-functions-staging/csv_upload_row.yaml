@@ -1,0 +1,37 @@
+databaseChangeLog:
+  - changeSet:
+      id: csv_upload_row-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                -- CSV upload endpoint
+                -- Returns upload metadata after processing
+                create or replace function staging.csv_upload_row(
+                    _index int,
+                    _row text[],
+                    _prev_result int,
+                    _meta json
+                )
+                returns int
+                language plpgsql
+                as $$
+                begin
+                    -- If this is the first row (index 1), we can truncate the table to start fresh for this upload
+                    if _index = 1 then
+                        truncate staging.csv_uploads;
+                    end if;
+
+                    insert into staging.csv_uploads (user_id, file_name, row_index, row_data)
+                    values (
+                        (_meta->'claims'->>'user_id')::int,
+                        _meta->>'fileName',
+                        _index,
+                        coalesce(_row, '{}')
+                    );
+
+                    return coalesce(_prev_result, 0) + 1;
+                end;
+                $$;
+            splitStatements: false

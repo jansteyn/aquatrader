@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: csv_upload-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                -- CSV upload endpoint
+                -- Returns upload metadata after processing
+                create or replace function staging.csv_upload(
+                    _meta json = null
+                )
+                returns json
+                language sql
+                as $$
+                select _meta;
+                $$;
+
+                comment on function staging.csv_upload(json) is '
+                HTTP POST
+                @authorize
+                @upload for csv
+                @param _meta is upload metadata
+                @delimiters = ,;
+                @row_command = select staging.csv_upload_row($1,$2,$3,$4)';
