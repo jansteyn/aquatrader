@@ -46,5 +46,5 @@ databaseChangeLog:
                 $$;
                 comment on function prices.get_latest_eod_prices is '
                 HTTP GET /api/prices/eod/latest/{listingId}/limit/{limit}
-                @anonymous';
+                @authenticated';
             splitStatements: false

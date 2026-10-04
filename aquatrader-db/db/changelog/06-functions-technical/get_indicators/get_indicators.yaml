@@ -30,6 +30,6 @@ databaseChangeLog:
               $$;
               comment on function technical.get_indicators is '
               HTTP GET /api/technical/indicators
-              @anonymous';
+              @authenticated';
 
             splitStatements: false

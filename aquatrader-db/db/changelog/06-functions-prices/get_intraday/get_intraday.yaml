@@ -48,5 +48,5 @@ databaseChangeLog:
                 $$;
                 comment on function prices.get_intraday is '
                 HTTP GET /api/prices/intraday/{listingId}/{fromTime}/{toTime}
-                @anonymous';
+                @authenticated';
             splitStatements: false

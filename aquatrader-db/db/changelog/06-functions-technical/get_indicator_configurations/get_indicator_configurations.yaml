@@ -37,6 +37,6 @@ databaseChangeLog:
               $$;
                 comment on function technical.get_indicator_configurations is '
                 HTTP GET /api/technical/indicatorconfigurations/{indicatorId}
-                @anonymous';
+                @authenticated';
 
             splitStatements: false

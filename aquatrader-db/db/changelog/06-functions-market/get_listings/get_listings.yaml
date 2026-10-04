@@ -81,5 +81,5 @@ databaseChangeLog:
                 $$;
                 comment on function market.get_listings is '
                 HTTP GET /api/listings
-                @anonymous';
+                @authenticated';
             splitStatements: false

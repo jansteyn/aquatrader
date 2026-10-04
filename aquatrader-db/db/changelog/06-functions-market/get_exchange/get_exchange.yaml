@@ -39,5 +39,5 @@ databaseChangeLog:
                 $$;
                 comment on function market.get_exchange is '
                 HTTP GET /api/exchanges/{id}
-                @anonymous';
+                @authenticated';
             splitStatements: false

@@ -79,5 +79,5 @@ databaseChangeLog:
                 $$;
                 comment on function market.search_listings is '
                 HTTP GET /api/listings/search/query/{query}/pagesize/{pageSize}
-                @anonymous';
+                @authenticated';
             splitStatements: false

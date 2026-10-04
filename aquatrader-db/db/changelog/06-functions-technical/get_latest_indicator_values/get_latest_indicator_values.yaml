@@ -53,6 +53,6 @@ databaseChangeLog:
               $$;
               comment on function technical.get_latest_indicator_values is '
               HTTP GET /api/technical/latestindicatorvalues/{listingId}/{indicatorConfigurationIds}
-              @anonymous';
+              @authenticated';
 
             splitStatements: false

@@ -33,5 +33,5 @@ databaseChangeLog:
                 $$;
                 comment on function market.get_currency is '
                 HTTP GET /api/currencies/{id}
-                @anonymous';
+                @authenticated';
             splitStatements: false

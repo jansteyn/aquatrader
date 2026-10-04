@@ -37,5 +37,5 @@ databaseChangeLog:
                 $$;
                 comment on function market.get_trading_sessions is '
                 HTTP GET /api/exchanges/trading-sessions/{exchange_id}/{from_date}/{to_date}
-                @anonymous';
+                @authenticated';
             splitStatements: false

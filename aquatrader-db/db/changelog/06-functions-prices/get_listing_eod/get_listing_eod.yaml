@@ -71,7 +71,7 @@ databaseChangeLog:
                 $$;
                 comment on function prices.get_listing_eod is '
                 HTTP GET /api/prices/detaileod/{listingId}/{fromDate}/{toDate}
-                @anonymous';
+                @authenticated';
             splitStatements: false
 
                 

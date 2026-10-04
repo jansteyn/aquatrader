@@ -47,5 +47,5 @@ databaseChangeLog:
                 $$;
                 comment on function prices.get_latest_market_snapshot is '
                 HTTP GET /api/prices/market-snapshot/listing_ids/{listing_ids}
-                @anonymous';
+                @authenticated';
             splitStatements: false

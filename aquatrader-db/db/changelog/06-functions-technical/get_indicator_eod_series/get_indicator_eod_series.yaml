@@ -51,6 +51,6 @@ databaseChangeLog:
               $$;
               comment on function technical.get_indicator_eod_series is '
               HTTP GET /api/technical/indicatoreodseries/{listingId}/{indicatorConfigurationId}/{fromDate}/{toDate}
-              @anonymous';
+              @authenticated';
 
             splitStatements: false

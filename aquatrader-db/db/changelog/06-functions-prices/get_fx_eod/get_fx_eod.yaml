@@ -45,5 +45,5 @@ databaseChangeLog:
                 $$;
                 comment on function prices.get_fx_eod is '
                 HTTP GET /api/prices/fx/eod/{baseCurrency}/{quoteCurrency}/{fromDate}/{toDate}
-                @anonymous';
+                @authenticated';
             splitStatements: false

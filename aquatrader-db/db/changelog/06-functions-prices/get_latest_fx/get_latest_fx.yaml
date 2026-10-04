@@ -43,5 +43,5 @@ databaseChangeLog:
                 $$;
                 comment on function prices.get_latest_fx is '
                 HTTP GET /api/prices/fx/latest/{baseCurrency}/{quoteCurrency}
-                @anonymous';
+                @authenticated';
             splitStatements: false

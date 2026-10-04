@@ -42,5 +42,5 @@ databaseChangeLog:
                 $$;
                 comment on function market.search_instruments is '
                 HTTP GET /api/instruments/search/query/{query}/pagesize/{pageSize}
-                @anonymous';
+                @authenticated';
             splitStatements: false

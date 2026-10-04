@@ -45,5 +45,5 @@ databaseChangeLog:
                 $$;
                 comment on function prices.get_latest_intraday is '
                 HTTP GET /api/prices/intraday/latest/{listingId}
-                @anonymous';
+                @authenticated';
             splitStatements: false
