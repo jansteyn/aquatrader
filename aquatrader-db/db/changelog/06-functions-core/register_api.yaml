@@ -1,13 +1,13 @@
 databaseChangeLog:
   - changeSet:
-      id: create-register_user-function
+      id: create-register_api-function
       author: jan
       runOnChange: true
       changes:
         - sql:
             sql: |
-                DROP FUNCTION IF EXISTS core.register_user;
-                CREATE OR REPLACE FUNCTION core.register_user(
+                DROP FUNCTION IF EXISTS core.register_api;
+                CREATE OR REPLACE FUNCTION core.register_api(
                     _username varchar(100),
                     _full_name varchar(255),
                     _billing_address text,
@@ -30,8 +30,8 @@ databaseChangeLog:
                     )
                     VALUES 
                     (
-                        _username, _full_name, _billing_address, _email, ARRAY['user'], 
-                        _password_hash, _phone_number, 'register_user'
+                        _username, _full_name, _billing_address, _email, ARRAY['tbd'], 
+                        _password_hash, _phone_number, 'register_api'
                     )
                     returning core.users.id INTO v_user_id;
 
@@ -40,7 +40,7 @@ databaseChangeLog:
                     select v_user_id;
                 END;
                 $$ LANGUAGE plpgsql;
-                comment on function core.register_user is '
+                comment on function core.register_api is '
                 HTTP POST
                 @param _password_hash is hash of _password
                 @sensitive

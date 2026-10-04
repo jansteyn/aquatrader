@@ -1,14 +1,14 @@
 databaseChangeLog:
   - changeSet:
-      id: create-user-login-function
+      id: create-api_login-function
       author: jan
       runOnChange: true
       changes:
         - sql:
             sql: |
-                DROP FUNCTION IF EXISTS core.login;
+                DROP FUNCTION IF EXISTS core.api_login;
                 
-                CREATE OR REPLACE FUNCTION core.login
+                CREATE OR REPLACE FUNCTION core.api_login
                 (
                     _scheme varchar(50),
                     _apikey varchar(100),
@@ -38,7 +38,7 @@ databaseChangeLog:
                     WHERE users.username = _apikey;
                 END;
                 $$;
-                comment on function core.login is '
+                comment on function core.api_login is '
                 HTTP POST
                 @login
                 @sensitive

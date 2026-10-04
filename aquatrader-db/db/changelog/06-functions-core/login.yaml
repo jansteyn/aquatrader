@@ -17,7 +17,6 @@ databaseChangeLog:
                 RETURNS TABLE (
                     scheme varchar(50),
                     user_id bigint,
-                    organisation_id bigint,
                     username varchar(100),
                     roles text[],
                     email varchar(255),
@@ -31,13 +30,11 @@ databaseChangeLog:
                     SELECT
                         _scheme,  -- Maps to the 'scheme' output column
                         users.id,
-                        organisation_users.organisation_id,
                         users.username,
                         users.roles,
                         users.email,
                         users.password_hash
                     FROM core.users
-                    JOIN core.organisation_users ON users.id = organisation_users.user_id
                     WHERE users.username = _username;
                 END;
                 $$;

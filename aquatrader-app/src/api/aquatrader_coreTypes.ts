@@ -20,9 +20,7 @@ export interface ICoreCoreRegisterUserResponse {
 }
 
 export interface ICoreCoreUserProfileResponse {
-    organisationId: number | null;
-    billingName: string | null;
-    billingEmail: string | null;
+    fullName: string | null;
     userId: number | null;
     username: string | null;
     roles: string[] | null;

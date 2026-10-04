@@ -10,11 +10,9 @@ databaseChangeLog:
                 
                 CREATE OR REPLACE FUNCTION core.user_profile()
                 RETURNS TABLE (
-                    organisation_id bigint,
-                    billing_name varchar(255),
-                    billing_email varchar(255),
                     user_id bigint,
                     username varchar(100),
+                    full_name varchar(255),
                     roles text[],
                     email varchar(255)
                 )
@@ -23,23 +21,18 @@ databaseChangeLog:
                 BEGIN
                     RETURN QUERY
                     SELECT 
-                        o.id, 
-                        o.billing_name, 
-                        o.billing_email, 
                         u.id,
                         u.username,
+                        u.full_name,
                         u.roles,
                         u.email
                     FROM 
                         core.users u
-                        LEFT JOIN core.organisation_users ou ON u.id = ou.user_id
-                        LEFT JOIN core.organisations o ON ou.organisation_id = o.id
                     WHERE u.id = current_setting('request.user_id')::bigint;
                 END;
                 $$;
                 comment on function core.user_profile is '
                 HTTP GET
-
                 @sensitive
                 @authenticated';
             splitStatements: false

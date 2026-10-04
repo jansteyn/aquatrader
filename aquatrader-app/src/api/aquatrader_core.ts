@@ -14,7 +14,6 @@ type ApiResult<T> = {status: number, response: T, error: ApiError | undefined};
 * returns table(
 *     scheme character varying,
 *     user_id bigint,
-*     organisation_id bigint,
 *     username character varying,
 *     roles text[],
 *     email character varying,
@@ -91,9 +90,9 @@ export async function coreCoreRegisterUser(
 /**
 * function core.user_profile()
 * returns table(
-*     organisation_id bigint,
-*     billing_name character varying,
-*     billing_email character varying,
+
+*     full_name character varying,
+*     email character varying,
 *     user_id bigint,
 *     username character varying,
 *     roles text[],
