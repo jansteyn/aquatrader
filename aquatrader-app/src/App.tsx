@@ -14,6 +14,8 @@ import {
 import './App.css';
 import { ListingPage } from './pages/ListingPage';
 import { ListingEodChart } from './pages/Listing/ListingEodChart';
+import { LoginPage } from './pages/Auth/LoginPage';
+import { RegisterPage } from './pages/Auth/RegisterPage';
 
 function LandingPage() {
   return (
@@ -135,6 +137,12 @@ export default function App() {
             <Button component={RouterLink} to="/listing/eod-chart/1?fromDate=2025-01-01&toDate=2025-01-31" color="inherit">
               ListingEoDChart
             </Button>
+            <Button component={RouterLink} to="/login" color="inherit">
+              Sign in
+            </Button>
+            <Button component={RouterLink} to="/register" color="inherit">
+              Register
+            </Button>
           </Box>
         </Toolbar>
       </AppBar>
@@ -144,6 +152,8 @@ export default function App() {
         <Route path="/listing" element={<ListingPage />} />
         <Route path="/listing/eod-chart/:listingId" element={<ListingEodChartRoute />} />
         <Route path="/listing/eod-chart" element={<ListingEodChartRoute />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
       </Routes>
     </BrowserRouter>
   );

@@ -1,0 +1,124 @@
+@host=http://localhost:8080
+
+// function technical.get_indicator_configurations(
+//     _indicator_id smallint DEFAULT NULL::smallint
+// )
+// returns table(
+//     indicator_configuration_id bigint,
+//     indicator_id smallint,
+//     indicator_code character varying,
+//     indicator_name character varying,
+//     parameters jsonb
+// )
+//
+// comment on function technical.get_indicator_configurations is '  HTTP GET /api/technical/indicatorconfigurations/{indicatorId}
+//   @anonymous';
+GET {{host}}/api/technical/indicatorconfigurations/{indicatorid}
+
+###
+
+// function technical.get_indicator_eod(
+//     _listing_id bigint,
+//     _indicator_configuration_id bigint,
+//     _from_date date,
+//     _to_date date
+// )
+// returns table(
+//     price_date date,
+//     value_1 double precision,
+//     value_2 double precision,
+//     value_3 double precision,
+//     value_4 double precision
+// )
+//
+// comment on function technical.get_indicator_eod is 'HTTP GET /api/technical/indicatoreod/{listingId}/{indicatorConfigurationId}/{fromDate}/{toDate}
+// @anonymous';
+GET {{host}}/api/technical/indicatoreod/{listingid}/{indicatorconfigurationid}/{fromdate}/{todate}
+
+###
+
+// function technical.get_indicator_eod_series(
+//     _listing_id bigint,
+//     _indicator_configuration_id bigint,
+//     _from_date date,
+//     _to_date date
+// )
+// returns table(
+//     price_date date,
+//     indicator_configuration_id bigint,
+//     indicator_code character varying,
+//     indicator_name character varying,
+//     parameters jsonb,
+//     value_1 double precision,
+//     value_2 double precision,
+//     value_3 double precision,
+//     value_4 double precision
+// )
+//
+// comment on function technical.get_indicator_eod_series is 'HTTP GET /api/technical/indicatoreodseries/{listingId}/{indicatorConfigurationId}/{fromDate}/{toDate}
+// @anonymous';
+GET {{host}}/api/technical/indicatoreodseries/{listingid}/{indicatorconfigurationid}/{fromdate}/{todate}
+
+###
+
+// function technical.get_indicators()
+// returns table(
+//     indicator_id smallint,
+//     code character varying,
+//     name character varying,
+//     description text,
+//     output_count smallint
+// )
+//
+// comment on function technical.get_indicators is 'HTTP GET /api/technical/indicators
+// @anonymous';
+GET {{host}}/api/technical/indicators
+
+###
+
+// function technical.get_indicators_eod_series(
+//     _listing_id bigint,
+//     _indicator_configuration_ids bigint[],
+//     _from_date date,
+//     _to_date date
+// )
+// returns table(
+//     price_date date,
+//     indicator_configuration_id bigint,
+//     indicator_code character varying,
+//     indicator_name character varying,
+//     parameters jsonb,
+//     value_1 double precision,
+//     value_2 double precision,
+//     value_3 double precision,
+//     value_4 double precision
+// )
+//
+// comment on function technical.get_indicators_eod_series is 'HTTP GET /api/technical/indicatorseodseries/{listingId}/{indicatorConfigurationIds}/{fromDate}/{toDate}
+// @anonymous';
+GET {{host}}/api/technical/indicatorseodseries/{listingid}/{indicatorconfigurationids}/{fromdate}/{todate}
+
+###
+
+// function technical.get_latest_indicator_values(
+//     _listing_id bigint,
+//     _indicator_configuration_ids bigint[] DEFAULT NULL::bigint[]
+// )
+// returns table(
+//     price_date date,
+//     indicator_configuration_id bigint,
+//     indicator_code character varying,
+//     indicator_name character varying,
+//     parameters jsonb,
+//     value_1 double precision,
+//     value_2 double precision,
+//     value_3 double precision,
+//     value_4 double precision
+// )
+//
+// comment on function technical.get_latest_indicator_values is 'HTTP GET /api/technical/latestindicatorvalues/{listingId}/{indicatorConfigurationIds}
+// @anonymous';
+GET {{host}}/api/technical/latestindicatorvalues/{listingid}/{indicatorconfigurationids}
+
+###
+

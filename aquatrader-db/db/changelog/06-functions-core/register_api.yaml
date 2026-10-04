@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: create-register_user-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                DROP FUNCTION IF EXISTS core.register_user;
+                CREATE OR REPLACE FUNCTION core.register_user(
+                    _username varchar(100),
+                    _full_name varchar(255),
+                    _billing_address text,
+                    _email varchar(255),
+                    _password varchar(255),
+                    _password_hash text,
+                    _phone_number varchar(20)
+                )
+                RETURNS TABLE (
+                    user_id BIGINT
+                ) AS $$
+                DECLARE 
+                    v_user_id BIGINT;
+                BEGIN
+                    
+                    INSERT INTO core.users 
+                    (
+                        username, full_name, billing_address, email, roles, 
+                        password_hash, phone_number, created_via
+                    )
+                    VALUES 
+                    (
+                        _username, _full_name, _billing_address, _email, ARRAY['user'], 
+                        _password_hash, _phone_number, 'register_user'
+                    )
+                    returning core.users.id INTO v_user_id;
+
+
+                    return query
+                    select v_user_id;
+                END;
+                $$ LANGUAGE plpgsql;
+                comment on function core.register_user is '
+                HTTP POST
+                @param _password_hash is hash of _password
+                @sensitive
+                @anonymous';
+            splitStatements: false

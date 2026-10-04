@@ -1,0 +1,187 @@
+@host=http://localhost:8080
+
+// function prices.get_eod(
+//     _listing_id bigint,
+//     _from_date date,
+//     _to_date date
+// )
+// returns table(
+//     price_date date,
+//     open numeric,
+//     high numeric,
+//     low numeric,
+//     close numeric,
+//     adjusted_close numeric,
+//     volume numeric,
+//     trade_count bigint
+// )
+//
+// comment on function prices.get_eod is 'HTTP GET /api/prices/eod/{listingId}/{fromDate}/{toDate}
+// @anonymous';
+GET {{host}}/api/prices/eod/{listingid}/{fromdate}/{todate}
+
+###
+
+// function prices.get_fx_eod(
+//     _base_currency character varying,
+//     _quote_currency character varying,
+//     _from_date date,
+//     _to_date date
+// )
+// returns table(
+//     price_date date,
+//     base_currency character varying,
+//     quote_currency character varying,
+//     rate numeric
+// )
+//
+// comment on function prices.get_fx_eod is 'HTTP GET /api/prices/fx/eod/{baseCurrency}/{quoteCurrency}/{fromDate}/{toDate}
+// @anonymous';
+GET {{host}}/api/prices/fx/eod/{basecurrency}/{quotecurrency}/{fromdate}/{todate}
+
+###
+
+// function prices.get_intraday(
+//     _listing_id bigint,
+//     _from_time timestamp with time zone,
+//     _to_time timestamp with time zone
+// )
+// returns table(
+//     price_time timestamp with time zone,
+//     open numeric,
+//     high numeric,
+//     low numeric,
+//     close numeric,
+//     volume numeric,
+//     trade_count bigint
+// )
+//
+// comment on function prices.get_intraday is 'HTTP GET /api/prices/intraday/{listingId}/{fromTime}/{toTime}
+// @anonymous';
+GET {{host}}/api/prices/intraday/{listingid}/{fromtime}/{totime}
+
+###
+
+// function prices.get_latest_eod(
+//     _listing_id bigint
+// )
+// returns table(
+//     listing_id bigint,
+//     price_date date,
+//     open numeric,
+//     high numeric,
+//     low numeric,
+//     close numeric,
+//     adjusted_close numeric,
+//     volume numeric,
+//     trade_count bigint
+// )
+//
+// comment on function prices.get_latest_eod is 'HTTP GET /api/prices/eod/latest/{listingId}
+// @anonymous';
+GET {{host}}/api/prices/eod/latest/{listingid}
+
+###
+
+// function prices.get_latest_eod_prices(
+//     _listing_id bigint,
+//     _limit integer DEFAULT 200
+// )
+// returns table(
+//     price_date date,
+//     open numeric,
+//     high numeric,
+//     low numeric,
+//     close numeric,
+//     adjusted_close numeric,
+//     volume numeric
+// )
+//
+// comment on function prices.get_latest_eod_prices is 'HTTP GET /api/prices/eod/latest/{listingId}/limit/{limit}
+// @anonymous';
+GET {{host}}/api/prices/eod/latest/{listingid}/limit/{limit}
+
+###
+
+// function prices.get_latest_fx(
+//     _base_currency character varying,
+//     _quote_currency character varying
+// )
+// returns table(
+//     price_date date,
+//     base_currency character varying,
+//     quote_currency character varying,
+//     rate numeric
+// )
+//
+// comment on function prices.get_latest_fx is 'HTTP GET /api/prices/fx/latest/{baseCurrency}/{quoteCurrency}
+// @anonymous';
+GET {{host}}/api/prices/fx/latest/{basecurrency}/{quotecurrency}
+
+###
+
+// function prices.get_latest_intraday(
+//     _listing_id bigint
+// )
+// returns table(
+//     price_time timestamp with time zone,
+//     open numeric,
+//     high numeric,
+//     low numeric,
+//     close numeric,
+//     volume numeric,
+//     trade_count bigint
+// )
+//
+// comment on function prices.get_latest_intraday is 'HTTP GET /api/prices/intraday/latest/{listingId}
+// @anonymous';
+GET {{host}}/api/prices/intraday/latest/{listingid}
+
+###
+
+// function prices.get_latest_market_snapshot(
+//     _listing_ids bigint[]
+// )
+// returns table(
+//     listing_id bigint,
+//     price_date date,
+//     open numeric,
+//     high numeric,
+//     low numeric,
+//     close numeric,
+//     adjusted_close numeric,
+//     volume numeric
+// )
+//
+// comment on function prices.get_latest_market_snapshot is 'HTTP GET /api/prices/market-snapshot/listing_ids/{listing_ids}
+// @anonymous';
+GET {{host}}/api/prices/market-snapshot/listing_ids/{listing_ids}?listingIds=1&listingIds=2&listingIds=3
+
+###
+
+// function prices.get_listing_eod(
+//     _listing_id bigint,
+//     _from_date date,
+//     _to_date date
+// )
+// returns table(
+//     listing_id bigint,
+//     symbol character varying,
+//     instrument_name character varying,
+//     exchange_name character varying,
+//     currency_code character varying,
+//     price_date date,
+//     open numeric,
+//     high numeric,
+//     low numeric,
+//     close numeric,
+//     adjusted_close numeric,
+//     volume numeric
+// )
+//
+// comment on function prices.get_listing_eod is 'HTTP GET /api/prices/detaileod/{listingId}/{fromDate}/{toDate}
+// @anonymous';
+GET {{host}}/api/prices/detaileod/{listingid}/{fromdate}/{todate}
+
+###
+

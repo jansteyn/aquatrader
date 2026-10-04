@@ -1,0 +1,82 @@
+@host=http://localhost:8080
+
+// function core.login(
+//     _scheme character varying,
+//     _username character varying,
+//     _password character varying
+// )
+// returns table(
+//     scheme character varying,
+//     user_id bigint,
+//     organisation_id bigint,
+//     username character varying,
+//     roles text[],
+//     email character varying,
+//     password_hash text
+// )
+//
+// comment on function core.login is 'HTTP POST
+// @login
+// @sensitive
+// @anonymous';
+POST {{host}}/api/core/login
+content-type: application/json
+
+{
+    "scheme": "ABC",
+    "username": "XYZ",
+    "password": "IJK"
+}
+
+###
+
+// function core.register_user(
+//     _username character varying,
+//     _full_name character varying,
+//     _billing_address text,
+//     _email character varying,
+//     _password character varying,
+//     _password_hash text,
+//     _phone_number character varying
+// )
+// returns table(
+//     user_id bigint
+// )
+//
+// comment on function core.register_user is 'HTTP POST
+// @param _password_hash is hash of _password
+// @sensitive
+// @anonymous';
+POST {{host}}/api/core/register-user
+content-type: application/json
+
+{
+    "username": "ABC",
+    "fullName": "XYZ",
+    "billingAddress": "IJK",
+    "email": "ABC",
+    "password": "XYZ",
+    "passwordHash": "IJK",
+    "phoneNumber": "ABC"
+}
+
+###
+
+// function core.user_profile()
+// returns table(
+//     organisation_id bigint,
+//     billing_name character varying,
+//     billing_email character varying,
+//     user_id bigint,
+//     username character varying,
+//     roles text[],
+//     email character varying
+// )
+//
+// comment on function core.user_profile is 'HTTP GET
+// @sensitive
+// @authenticated';
+GET {{host}}/api/core/user-profile
+
+###
+

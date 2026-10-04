@@ -15,7 +15,7 @@ public sealed class TechnicalAnalysisService(
 	private readonly IIndicatorRepository _indicatorRepository = indicatorRepository;
 	private readonly IIndicatorEodRepository _indicatorEodRepository = indicatorEodRepository;
 	private readonly IIndicatorCalculationRunRepository _runRepository = runRepository;
-private readonly IKeyedServiceProvider _keyedServiceProvider = keyedServiceProvider;
+	private readonly IKeyedServiceProvider _keyedServiceProvider = keyedServiceProvider;
 
     public async Task CalculateAsync(
 		CalculateIndicatorRequest request,
