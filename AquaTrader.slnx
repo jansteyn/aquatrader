@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="AquaTrader.Api/AquaTrader.Api.csproj" />
+  <Project Path="AquaTraderUpload/AquaTraderUpload.csproj" />
   <Project Path="TechnicalAnalysis.Application/TechnicalAnalysis.Application.csproj" Id="503169cb-5822-496a-974d-4e413da10e2f" />
   <Project Path="TechnicalAnalysis.Domain/TechnicalAnalysis.Domain.csproj" Id="7a9ef429-cb1b-4851-8cc9-9564b4be664c" />
   <Project Path="TechnicalAnalysis.Infrastructure/TechnicalAnalysis.Infrastructure.csproj" Id="4c60df81-37bc-4027-8759-5ce58df08712" />
