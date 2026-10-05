@@ -1,5 +1,6 @@
 using AquaTraderUpload;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
 var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
@@ -15,4 +16,10 @@ settings.ApiKey = Environment.GetEnvironmentVariable("AQUATRADERUPLOAD_API_KEY")
 settings.ApiSecret = Environment.GetEnvironmentVariable("AQUATRADERUPLOAD_API_SECRET") ?? string.Empty;
 settings.Validate();
 
-Console.WriteLine($"AquaTraderUpload settings loaded for {settings.ApiUrl}.");
+builder.Services.AddSingleton(settings);
+builder.Services.AddSingleton(new HttpClient());
+builder.Services.AddSingleton<UploadService>();
+
+using var host = builder.Build();
+var uploadService = host.Services.GetRequiredService<UploadService>();
+await uploadService.ProcessFilesAsync();

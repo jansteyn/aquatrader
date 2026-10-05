@@ -401,3 +401,8 @@ FodyWeavers.xsd
 # NPGSQLRest
 npgsqlrest/logs/*
 npgsqlrest/npgsqlrest.exe
+
+#VS Code Counter
+.VSCodeCounter/
+.VSCodeCounter
+.VSCodeCounter/*
