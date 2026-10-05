@@ -1,21 +1,27 @@
 using System.Net.Http.Headers;
-using System.Text;
+using System.Net.Http.Json;
+using System.Text.Json;
 using Microsoft.Extensions.Logging;
+using AquaTraderUpload.Models;
 
-namespace AquaTraderUpload;
+namespace AquaTraderUpload.Services;
 
 public sealed class UploadService(
     AquaTraderUploadSettings settings,
     HttpClient httpClient,
-    ILogger<UploadService> logger)
+    ILogger<UploadService> logger,
+    LoginService loginService)
 {
+    private static readonly Uri LoginPath = new("api/api_login", UriKind.Relative);
     private static readonly Uri UploadPath = new("api/staging/csvupload", UriKind.Relative);
 
     public async Task ProcessFilesAsync(CancellationToken cancellationToken = default)
     {
         var sourceFolder = Path.GetFullPath(settings.SourceFolder);
         var archiveFolder = Path.GetFullPath(settings.ArchiveFolder);
-        var uploadUri = new Uri(new Uri($"{settings.ApiUrl.TrimEnd('/')}/"), UploadPath);
+        var apiBaseUri = new Uri($"{settings.ApiUrl.TrimEnd('/')}/");
+        var loginUri = new Uri(apiBaseUri, LoginPath);
+        var uploadUri = new Uri(apiBaseUri, UploadPath);
         var files = Directory
             .EnumerateFiles(sourceFolder, "*.csv", SearchOption.TopDirectoryOnly)
             .OrderBy(Path.GetFileName, StringComparer.Ordinal)
@@ -28,6 +34,7 @@ public sealed class UploadService(
         }
 
         Directory.CreateDirectory(archiveFolder);
+        var jwt = await loginService.LoginAsync(loginUri, cancellationToken);
 
         foreach (var filePath in files)
         {
@@ -35,9 +42,7 @@ public sealed class UploadService(
 
             var fileName = Path.GetFileName(filePath);
             using var request = new HttpRequestMessage(HttpMethod.Post, uploadUri);
-            var credentials = Convert.ToBase64String(
-                Encoding.UTF8.GetBytes($"{settings.ApiKey}:{settings.ApiSecret}"));
-            request.Headers.Authorization = new AuthenticationHeaderValue("Basic", credentials);
+            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", jwt);
 
             var fileStream = File.OpenRead(filePath);
             var fileContent = new StreamContent(fileStream);
@@ -55,4 +60,5 @@ public sealed class UploadService(
             logger.LogInformation("Uploaded and archived {FileName}.", fileName);
         }
     }
+
 }

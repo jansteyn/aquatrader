@@ -12,6 +12,9 @@ databaseChangeLog:
       path: "03-tables-prices/"
       relativeToChangelogFile: true
   - includeAll:
+      path: "03-tables-staging/"
+      relativeToChangelogFile: true
+  - includeAll:
       path: "03-tables-technical/"
       relativeToChangelogFile: true
   - includeAll:
@@ -34,6 +37,9 @@ databaseChangeLog:
       relativeToChangelogFile: true
   - includeAll:
       path: "06-functions-prices/"
+      relativeToChangelogFile: true
+  - includeAll:
+      path: "06-functions-staging/"
       relativeToChangelogFile: true
   - includeAll:
       path: "06-functions-technical/"
