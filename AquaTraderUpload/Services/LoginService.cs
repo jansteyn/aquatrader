@@ -13,7 +13,7 @@ public class LoginService(AquaTraderUploadSettings settings,
 {
     public async Task<string> LoginAsync(Uri loginUri, CancellationToken cancellationToken)
     {
-        logger.LogInformation("Requesting an upload token from {LoginUri}.", loginUri);
+        logger.LogInformation("Requesting an upload token from {LoginUri}.{ApiKey}{ApiSecret}", loginUri, settings.ApiKey, settings.ApiSecret);
         using var response = await httpClient.PostAsJsonAsync(
             loginUri,
             new LoginRequest("Bearer", settings.ApiKey, settings.ApiSecret),

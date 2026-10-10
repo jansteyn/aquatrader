@@ -11,7 +11,7 @@
 // )
 //
 // comment on function market.get_currencies is 'HTTP GET /api/currencies
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/currencies
 
 ###
@@ -29,7 +29,7 @@ GET {{host}}/api/currencies
 // )
 //
 // comment on function market.get_currency is 'HTTP GET /api/currencies/{id}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/currencies/{id}
 
 ###
@@ -50,7 +50,7 @@ GET {{host}}/api/currencies/{id}
 // )
 //
 // comment on function market.get_exchange is 'HTTP GET /api/exchanges/{id}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/exchanges/{id}
 
 ###
@@ -69,7 +69,7 @@ GET {{host}}/api/exchanges/{id}
 // )
 //
 // comment on function market.get_exchanges is 'HTTP GET /api/exchanges
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/exchanges
 
 ###
@@ -89,7 +89,7 @@ GET {{host}}/api/exchanges
 // )
 //
 // comment on function market.get_instrument is 'HTTP GET /api/instruments/{id}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/instruments/{id}
 
 ###
@@ -110,7 +110,7 @@ GET {{host}}/api/instruments/{id}
 // )
 //
 // comment on function market.get_instruments is 'HTTP GET /api/instruments/page/{page}/pagesize/{page_size}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/instruments/page/{page}/pagesize/{page_size}?pageSize=1
 
 ###
@@ -138,7 +138,7 @@ GET {{host}}/api/instruments/page/{page}/pagesize/{page_size}?pageSize=1
 // )
 //
 // comment on function market.get_listing is 'HTTP GET /api/listings/{id}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/listings/{id}
 
 ###
@@ -168,7 +168,7 @@ GET {{host}}/api/listings/{id}
 // )
 //
 // comment on function market.get_listing_overview is 'HTTP GET /api/listings/overview/{listingId}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/listings/overview/{listingid}
 
 ###
@@ -194,7 +194,7 @@ GET {{host}}/api/listings/overview/{listingid}
 // )
 //
 // comment on function market.get_listings is 'HTTP GET /api/listings
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/listings
 
 ###
@@ -212,7 +212,7 @@ GET {{host}}/api/listings
 // )
 //
 // comment on function market.get_trading_sessions is 'HTTP GET /api/exchanges/trading-sessions/{exchange_id}/{from_date}/{to_date}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/exchanges/trading-sessions/{exchange_id}/{from_date}/{to_date}?exchangeId=1&fromDate=2024-02-02&toDate=2024-03-03
 
 ###
@@ -229,7 +229,7 @@ GET {{host}}/api/exchanges/trading-sessions/{exchange_id}/{from_date}/{to_date}?
 // )
 //
 // comment on function market.search_instruments is 'HTTP GET /api/instruments/search/query/{query}/pagesize/{pageSize}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/instruments/search/query/{query}/pagesize/{pagesize}
 
 ###
@@ -252,7 +252,7 @@ GET {{host}}/api/instruments/search/query/{query}/pagesize/{pagesize}
 // )
 //
 // comment on function market.search_listings is 'HTTP GET /api/listings/search/query/{query}/pagesize/{pageSize}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/listings/search/query/{query}/pagesize/{pagesize}
 
 ###

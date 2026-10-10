@@ -12,8 +12,8 @@ public sealed class UploadService(
     ILogger<UploadService> logger,
     LoginService loginService)
 {
-    private static readonly Uri LoginPath = new("api/api_login", UriKind.Relative);
-    private static readonly Uri UploadPath = new("api/staging/csvupload", UriKind.Relative);
+    private static readonly Uri LoginPath = new("api/core/api-login", UriKind.Relative);
+    private static readonly Uri UploadPath = new("api/staging/csv-upload?meta=%7B%7D", UriKind.Relative);
 
     public async Task ProcessFilesAsync(CancellationToken cancellationToken = default)
     {

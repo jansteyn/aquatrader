@@ -17,7 +17,7 @@
 // )
 //
 // comment on function prices.get_eod is 'HTTP GET /api/prices/eod/{listingId}/{fromDate}/{toDate}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/eod/{listingid}/{fromdate}/{todate}
 
 ###
@@ -36,7 +36,7 @@ GET {{host}}/api/prices/eod/{listingid}/{fromdate}/{todate}
 // )
 //
 // comment on function prices.get_fx_eod is 'HTTP GET /api/prices/fx/eod/{baseCurrency}/{quoteCurrency}/{fromDate}/{toDate}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/fx/eod/{basecurrency}/{quotecurrency}/{fromdate}/{todate}
 
 ###
@@ -57,7 +57,7 @@ GET {{host}}/api/prices/fx/eod/{basecurrency}/{quotecurrency}/{fromdate}/{todate
 // )
 //
 // comment on function prices.get_intraday is 'HTTP GET /api/prices/intraday/{listingId}/{fromTime}/{toTime}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/intraday/{listingid}/{fromtime}/{totime}
 
 ###
@@ -78,7 +78,7 @@ GET {{host}}/api/prices/intraday/{listingid}/{fromtime}/{totime}
 // )
 //
 // comment on function prices.get_latest_eod is 'HTTP GET /api/prices/eod/latest/{listingId}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/eod/latest/{listingid}
 
 ###
@@ -98,7 +98,7 @@ GET {{host}}/api/prices/eod/latest/{listingid}
 // )
 //
 // comment on function prices.get_latest_eod_prices is 'HTTP GET /api/prices/eod/latest/{listingId}/limit/{limit}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/eod/latest/{listingid}/limit/{limit}
 
 ###
@@ -115,7 +115,7 @@ GET {{host}}/api/prices/eod/latest/{listingid}/limit/{limit}
 // )
 //
 // comment on function prices.get_latest_fx is 'HTTP GET /api/prices/fx/latest/{baseCurrency}/{quoteCurrency}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/fx/latest/{basecurrency}/{quotecurrency}
 
 ###
@@ -134,7 +134,7 @@ GET {{host}}/api/prices/fx/latest/{basecurrency}/{quotecurrency}
 // )
 //
 // comment on function prices.get_latest_intraday is 'HTTP GET /api/prices/intraday/latest/{listingId}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/intraday/latest/{listingid}
 
 ###
@@ -154,7 +154,7 @@ GET {{host}}/api/prices/intraday/latest/{listingid}
 // )
 //
 // comment on function prices.get_latest_market_snapshot is 'HTTP GET /api/prices/market-snapshot/listing_ids/{listing_ids}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/market-snapshot/listing_ids/{listing_ids}?listingIds=1&listingIds=2&listingIds=3
 
 ###
@@ -180,7 +180,7 @@ GET {{host}}/api/prices/market-snapshot/listing_ids/{listing_ids}?listingIds=1&l
 // )
 //
 // comment on function prices.get_listing_eod is 'HTTP GET /api/prices/detaileod/{listingId}/{fromDate}/{toDate}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/prices/detaileod/{listingid}/{fromdate}/{todate}
 
 ###

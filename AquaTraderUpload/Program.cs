@@ -19,6 +19,7 @@ settings.Validate();
 
 builder.Services.AddSingleton(settings);
 builder.Services.AddSingleton(new HttpClient());
+builder.Services.AddSingleton<LoginService>();
 builder.Services.AddSingleton<UploadService>();
 
 using var host = builder.Build();

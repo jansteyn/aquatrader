@@ -12,7 +12,7 @@
 // )
 //
 // comment on function technical.get_indicator_configurations is '  HTTP GET /api/technical/indicatorconfigurations/{indicatorId}
-//   @anonymous';
+//   @authenticated';
 GET {{host}}/api/technical/indicatorconfigurations/{indicatorid}
 
 ###
@@ -32,7 +32,7 @@ GET {{host}}/api/technical/indicatorconfigurations/{indicatorid}
 // )
 //
 // comment on function technical.get_indicator_eod is 'HTTP GET /api/technical/indicatoreod/{listingId}/{indicatorConfigurationId}/{fromDate}/{toDate}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/technical/indicatoreod/{listingid}/{indicatorconfigurationid}/{fromdate}/{todate}
 
 ###
@@ -56,7 +56,7 @@ GET {{host}}/api/technical/indicatoreod/{listingid}/{indicatorconfigurationid}/{
 // )
 //
 // comment on function technical.get_indicator_eod_series is 'HTTP GET /api/technical/indicatoreodseries/{listingId}/{indicatorConfigurationId}/{fromDate}/{toDate}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/technical/indicatoreodseries/{listingid}/{indicatorconfigurationid}/{fromdate}/{todate}
 
 ###
@@ -71,7 +71,7 @@ GET {{host}}/api/technical/indicatoreodseries/{listingid}/{indicatorconfiguratio
 // )
 //
 // comment on function technical.get_indicators is 'HTTP GET /api/technical/indicators
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/technical/indicators
 
 ###
@@ -95,7 +95,7 @@ GET {{host}}/api/technical/indicators
 // )
 //
 // comment on function technical.get_indicators_eod_series is 'HTTP GET /api/technical/indicatorseodseries/{listingId}/{indicatorConfigurationIds}/{fromDate}/{toDate}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/technical/indicatorseodseries/{listingid}/{indicatorconfigurationids}/{fromdate}/{todate}
 
 ###
@@ -117,7 +117,7 @@ GET {{host}}/api/technical/indicatorseodseries/{listingid}/{indicatorconfigurati
 // )
 //
 // comment on function technical.get_latest_indicator_values is 'HTTP GET /api/technical/latestindicatorvalues/{listingId}/{indicatorConfigurationIds}
-// @anonymous';
+// @authenticated';
 GET {{host}}/api/technical/latestindicatorvalues/{listingid}/{indicatorconfigurationids}
 
 ###
