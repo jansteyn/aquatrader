@@ -54,7 +54,7 @@ public sealed class UploadService(
             logger.LogInformation("Uploading {FileName} to {UploadUri}.", fileName, uploadUri);
             using var response = await httpClient.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
-
+            fileStream.Close();
             var archivedPath = Path.Combine(archiveFolder, fileName);
             File.Move(filePath, archivedPath);
             logger.LogInformation("Uploaded and archived {FileName}.", fileName);

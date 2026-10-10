@@ -2,7 +2,7 @@
 
 // function core.api_login(
 //     _scheme character varying,
-//     _apikey character varying,
+//     _api_key character varying,
 //     _password character varying
 // )
 // returns table(
@@ -16,14 +16,13 @@
 //
 // comment on function core.api_login is 'HTTP POST
 // @login
-// @sensitive
 // @anonymous';
 POST {{host}}/api/core/api-login
 content-type: application/json
 
 {
     "scheme": "ABC",
-    "apikey": "XYZ",
+    "apiKey": "XYZ",
     "password": "IJK"
 }
 

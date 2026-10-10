@@ -11,7 +11,7 @@ databaseChangeLog:
                 CREATE OR REPLACE FUNCTION core.api_login
                 (
                     _scheme varchar(50),
-                    _apikey varchar(100),
+                    _api_key varchar(100),
                     _password varchar(255)
                 )
                 RETURNS TABLE (
@@ -35,12 +35,12 @@ databaseChangeLog:
                         users.email,
                         users.password_hash
                     FROM core.users
-                    WHERE users.username = _apikey;
+                    WHERE users.username = _api_key;
                 END;
                 $$;
                 comment on function core.api_login is '
                 HTTP POST
                 @login
-                @sensitive
+
                 @anonymous';
             splitStatements: false
