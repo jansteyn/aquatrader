@@ -31,7 +31,8 @@ databaseChangeLog:
                         coalesce(_row, '{}')
                     );
 
-                    return coalesce(_prev_result, 0) + 1;
+
+                    return  coalesce(_prev_result, 0) + 1;
                 end;
                 $$;
             splitStatements: false

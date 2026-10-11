@@ -16,8 +16,14 @@ databaseChangeLog:
                   close               numeric(20,8) NOT NULL,
                   adjusted_close      numeric(20,8),
 
-                  volume              numeric(30,0),
+                  volume              bigint,
                   trade_count         bigint,
+                  trade_value         numeric(30,8),
+                  oi                  integer,
+                  dy                  numeric(15,4),
+                  ey                  numeric(15,4),
+                  bid                 numeric(15,4),
+                  offer               numeric(15,4),
 
                   PRIMARY KEY (listing_id, price_date),
 

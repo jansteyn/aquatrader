@@ -20,7 +20,7 @@ databaseChangeLog:
                   
                   -- Daily Price Data
                   -- Using DATE type. If your raw CSV has format 'YYYYMMDD', Postgres can parse it automatically.
-                  date DATE NOT NULL,
+                  price_date DATE NOT NULL,
                   open NUMERIC(15, 4),
                   high NUMERIC(15, 4),
                   low NUMERIC(15, 4),
@@ -36,8 +36,8 @@ databaseChangeLog:
                   oi INTEGER, -- Open Interest for derivatives
                   
                   -- Valuation & Structural Data
-                  dy NUMERIC(6, 3), -- E.g., 12.345%
-                  ey NUMERIC(6, 3), -- E.g., 15.678%
+                  dy NUMERIC(15, 4), -- E.g., 12.345%
+                  ey NUMERIC(15, 4), -- E.g., 15.678%
                   issued_shares BIGINT,
                   
                   -- Metadata for auditing/parsing
@@ -45,7 +45,7 @@ databaseChangeLog:
               );
 
               -- Performance Indexes for your staging queries
-              CREATE INDEX idx_raw_prices_date ON staging.snet_raw_share_prices(date);
+              CREATE INDEX idx_raw_prices_date ON staging.snet_raw_share_prices(price_date);
               CREATE INDEX idx_raw_prices_code ON staging.snet_raw_share_prices(code);
-              CREATE UNIQUE INDEX idx_raw_prices_unique_ticker_date ON staging.snet_raw_share_prices(code, date, exchange);
+              CREATE UNIQUE INDEX idx_raw_prices_unique_ticker_date ON staging.snet_raw_share_prices(code, price_date, exchange);
             splitStatements: false

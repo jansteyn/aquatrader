@@ -1,0 +1,75 @@
+databaseChangeLog:
+  - changeSet:
+      id: dn_upload-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+                -- CSV DN upload endpoint
+                -- Returns upload metadata after processing
+                create or replace function staging.dn_upload(
+                    _meta json = null
+                )
+                returns json
+                language plpgsql
+                as $$
+                begin
+                    delete from staging.csv_uploads where row_index <= 5; 
+                    truncate table staging.snet_raw_share_prices;
+                    insert into staging.snet_raw_share_prices (
+                        dn_name, exchange, code, dnsector, exchange_sector, price_date, open, high, low, close,
+                        volume, oi, dy, ey, value, deals, bid, offer, currency, issued_shares,
+                        full_name, ami_sector, isin
+                        ) 
+                    select 
+                    	dn_name, exchange, code, dnsector, exchange_sector, price_date::date, open::numeric(15,4), high::numeric(15,4), low::numeric(15,4), close::numeric(15,4),
+                        volume::bigint, oi::integer,
+                        CASE WHEN dy~E'^\\d+$' THEN dy::numeric(15,4) ELSE 0 end as dy,
+                        ey::numeric(15,4), value::numeric(18,4), deals::integer, bid::numeric(15,4), offer::numeric(15,4), currency,
+                        issued_shares::bigint,
+                        full_name, ami_sector, isin
+                    from crosstab(
+                        'SELECT id, row_index, elem_index, elem 
+                        FROM staging.csv_uploads, unnest(row_data) WITH ORDINALITY AS t(elem, elem_index) 
+                        ORDER BY 1, 2',
+                        'SELECT generate_series(1, 23)' -- Adjust 4 to the max expected array size
+                    ) AS pivot_table(id INT, 
+                        row_index int,
+                        dn_name text, 
+                        exchange text, 
+                        code text, 
+                        dnsector text, 
+                        exchange_sector text, 
+                        price_date text, 
+                        open text, 
+                        high text, 
+                        low text, 
+                        close text, 
+                        volume text, 
+                        oi text,
+                        dy text,
+                        ey text,
+                        value text,
+                        deals text,
+                        bid text,
+                        offer text,
+                        currency text,
+                        issued_shares text,
+                        full_name text,
+                        ami_sector text,
+                        isin text
+                        ) on conflict(code, price_date, exchange) do nothing;
+                    CALL staging.process_snet_staging_import();
+                    return _meta;
+                end;
+                $$;
+
+                comment on function staging.dn_upload(json) is '
+                HTTP POST
+                @authorize
+                @upload for csv
+                @param _meta is upload metadata
+                @delimiters = ,;
+                @row_command = select staging.dn_upload_row($1,$2,$3,$4)';
+            splitStatements: false
