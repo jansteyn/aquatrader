@@ -68,4 +68,43 @@ public sealed class IndicatorRepository
 	{
 		throw new NotImplementedException();
 	}
+
+	public async Task<IReadOnlyList<IndicatorConfigurationToRun>> GetConfigurationsToRunAsync(
+		CancellationToken cancellationToken = default)
+	{
+		const string sql = """
+            select
+                ic.indicator_configuration_id,
+                i.code,
+                ic.parameters::text
+            from technical.indicator_configuration ic
+            join technical.indicator i
+              on i.indicator_id = ic.indicator_id
+            where i.is_active
+            order by i.indicator_id, ic.indicator_configuration_id;
+            """;
+
+		await using var connection =
+			await _dataSource.OpenConnectionAsync(cancellationToken);
+
+		await using var command =
+			new NpgsqlCommand(sql, connection);
+
+		var configurations = new List<IndicatorConfigurationToRun>();
+
+		await using var reader =
+			await command.ExecuteReaderAsync(cancellationToken);
+
+		while (await reader.ReadAsync(cancellationToken))
+		{
+			configurations.Add(new IndicatorConfigurationToRun
+			{
+				IndicatorConfigurationId = reader.GetInt64(0),
+				IndicatorCode = reader.GetString(1),
+				ParametersJson = reader.GetString(2)
+			});
+		}
+
+		return configurations;
+	}
 }

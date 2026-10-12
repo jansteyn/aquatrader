@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-technical-analysis-price-eod-publication
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              create publication aquatrader_technical_analysis
+              for table prices.price_eod (listing_id, price_date)
+              with (
+                  publish = 'insert, update',
+                  publish_via_partition_root = true
+              );
+            splitStatements: false

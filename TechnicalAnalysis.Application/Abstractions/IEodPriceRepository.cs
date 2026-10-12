@@ -9,4 +9,10 @@ public interface IEodPriceRepository
 		DateOnly fromDate,
 		DateOnly toDate,
 		CancellationToken cancellationToken = default);
+
+	Task<EodPriceCalculationRange?> GetCalculationRangeAsync(
+		long listingId,
+		DateOnly changedDate,
+		int warmupPeriods,
+		CancellationToken cancellationToken = default);
 }

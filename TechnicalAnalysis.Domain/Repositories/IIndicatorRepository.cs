@@ -12,4 +12,7 @@ public interface IIndicatorRepository
 		string indicatorCode,
 		string parametersJson,
 		CancellationToken cancellationToken = default);
+
+	Task<IReadOnlyList<IndicatorConfigurationToRun>> GetConfigurationsToRunAsync(
+		CancellationToken cancellationToken = default);
 }

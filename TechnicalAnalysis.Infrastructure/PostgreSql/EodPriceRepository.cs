@@ -85,4 +85,54 @@ public sealed class EodPriceRepository
 
 		return prices;
 	}
+
+	public async Task<EodPriceCalculationRange?> GetCalculationRangeAsync(
+		long listingId,
+		DateOnly changedDate,
+		int warmupPeriods,
+		CancellationToken cancellationToken = default)
+	{
+		ArgumentOutOfRangeException.ThrowIfNegativeOrZero(warmupPeriods);
+
+		const string sql = """
+            with warmup_prices as
+            (
+                select price_date
+                from prices.price_eod
+                where listing_id = $1
+                  and price_date <= $2
+                order by price_date desc
+                limit $3
+            )
+            select
+                (select min(price_date) from warmup_prices),
+                (select max(price_date)
+                 from prices.price_eod
+                 where listing_id = $1);
+            """;
+
+		await using var connection =
+			await _dataSource.OpenConnectionAsync(cancellationToken);
+
+		await using var command =
+			new NpgsqlCommand(sql, connection);
+
+		command.Parameters.AddWithValue(listingId);
+		command.Parameters.AddWithValue(changedDate);
+		command.Parameters.AddWithValue(checked(warmupPeriods + 1));
+
+		await using var reader =
+			await command.ExecuteReaderAsync(cancellationToken);
+
+		if (!await reader.ReadAsync(cancellationToken) ||
+			reader.IsDBNull(0) ||
+			reader.IsDBNull(1))
+		{
+			return null;
+		}
+
+		return new EodPriceCalculationRange(
+			reader.GetFieldValue<DateOnly>(0),
+			reader.GetFieldValue<DateOnly>(1));
+	}
 }
