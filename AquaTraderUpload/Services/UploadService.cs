@@ -58,10 +58,6 @@ public sealed class UploadService(
                 logger.LogInformation("Uploading {FileName} to {UploadUri}.", fileName, uploadUri);
                 using var response = await httpClient.SendAsync(request, cancellationToken);
                 response.EnsureSuccessStatusCode();
-
-                var archivedPath = Path.Combine(archiveFolder, fileName);
-                File.Move(filePath, archivedPath);
-                logger.LogInformation("Uploaded and archived {FileName}.", fileName);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -82,10 +78,20 @@ public sealed class UploadService(
                 {
                     logger.LogError(moveException, "Could not move failed upload {FileName} to {ExceptionFolder}; it may remain in the source folder.", fileName, exceptionFolder);
                 }
-
-                throw;
+                continue;
             }
-        }
+            try
+            {
+                var archivedPath = Path.Combine(archiveFolder, fileName);
+                File.Move(filePath, archivedPath);
+                logger.LogInformation("Uploaded and archived {FileName}.", fileName);
+            }
+            catch (Exception archiveException)
+            {
+				logger.LogError(archiveException, "Could not move {FileName} to {ArchiveFolder}; it may remain in the source folder.", fileName, archiveFolder);
+
+			}
+		}
     }
 
     private static string GetExceptionFilePath(string exceptionFolder, string fileName)

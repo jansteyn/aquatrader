@@ -24,9 +24,9 @@ databaseChangeLog:
                       RETURN;
                   END IF;
 
-                  IF v_date_count <> 1 THEN
+                  /*IF v_date_count <> 1 THEN
                       RAISE EXCEPTION 'Expected staging.snet_raw_share_prices to contain one price date; found % dates', v_date_count;
-                  END IF;
+                  END IF;*/
 
                   IF EXISTS (
                       SELECT 1
@@ -34,7 +34,8 @@ databaseChangeLog:
                       WHERE nullif(btrim(exchange), '') IS NULL
                          OR nullif(btrim(code), '') IS NULL
                          OR nullif(btrim(currency), '') IS NULL
-                         OR length(btrim(currency)) <> 3
+                         OR (length(btrim(currency)) <> 3 
+                         and currency != 'OTHER')
                   ) THEN
                       RAISE EXCEPTION 'Staging rows must have an exchange, symbol, and three-character currency code';
                   END IF;
@@ -65,7 +66,7 @@ databaseChangeLog:
                   ORDER BY lower(btrim(exchange)), btrim(code), btrim(exchange);
 
                   INSERT INTO market.currency (code, name)
-                  SELECT DISTINCT currency_code, currency_code
+                  SELECT DISTINCT CASE WHEN currency_code = 'OTHER' THEN 'OTH' ELSE currency_code END, currency_code
                   FROM snet_import_rows
                   ON CONFLICT (code) DO NOTHING;
 
@@ -172,8 +173,14 @@ databaseChangeLog:
                       l.id,
                       r.price_date,
                       r.open,
-                      r.high,
-                      r.low,
+                      CASE
+                          WHEN r.high IS NULL THEN greatest(r.open, r.high, r.low, r.close)
+                          ELSE r.high
+                      END,
+                      CASE
+                          WHEN r.low IS NULL THEN least(r.open, r.high, r.low, r.close)
+                          ELSE r.low
+                      END,
                       r.close,
                       r.volume,
                       r.deals,
@@ -197,7 +204,7 @@ databaseChangeLog:
                   JOIN market.listing l
                     ON l.exchange_id = e.id
                    AND l.symbol = r.symbol
-                  WHERE r.price_date = v_import_date
+                  --WHERE r.price_date = v_import_date
                   ON CONFLICT (listing_id, price_date) DO UPDATE
                   SET open = EXCLUDED.open,
                       high = EXCLUDED.high,
