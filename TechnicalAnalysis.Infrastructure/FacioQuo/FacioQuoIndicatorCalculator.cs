@@ -8,10 +8,10 @@ using TechnicalAnalysis.Infrastructure.FacioQuo.Abstractions;
 
 namespace TechnicalAnalysis.Infrastructure.FacioQuo;
 
-public sealed class FacioQuoIndicatorCalculator(IKeyedServiceProvider keyedServiceProvider)
+public sealed class FacioQuoIndicatorCalculator(IServiceProvider  serviceProvider )
         : IProviderIndicatorCalculator
 {
-	private readonly IKeyedServiceProvider _keyedServiceProvider = keyedServiceProvider;
+	private readonly IServiceProvider  _serviceProvider  = serviceProvider;
     private const string providerName = "facioquo";
 	public static string ProviderName => providerName;
 
@@ -32,7 +32,7 @@ public sealed class FacioQuoIndicatorCalculator(IKeyedServiceProvider keyedServi
 				x.Volume))
 			.ToList();
 
-		var calculator = _keyedServiceProvider
+		var calculator = _serviceProvider
 			.GetRequiredKeyedService<IIndicatorCalculator>(indicatorCode);
 		var result = calculator.Calculate(
 			bars,

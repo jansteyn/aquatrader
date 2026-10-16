@@ -61,7 +61,8 @@ public sealed class PriceEodReplicationWorker(
 		var slot = await EnsureSlotAsync(connection, cancellationToken);
 		var options = new PgOutputReplicationOptions(
 			_options.PublicationName,
-			PgOutputProtocolVersion.V1);
+			PgOutputProtocolVersion.V2,
+			binary: true);
 		var changedPrices = new HashSet<PriceEodKey>();
 
 		logger.LogInformation(

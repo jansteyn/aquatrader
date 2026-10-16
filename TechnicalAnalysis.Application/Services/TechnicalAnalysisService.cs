@@ -9,13 +9,13 @@ public sealed class TechnicalAnalysisService(
     IIndicatorRepository indicatorRepository,
     IIndicatorEodRepository indicatorEodRepository,
     IIndicatorCalculationRunRepository runRepository,
-    IKeyedServiceProvider keyedServiceProvider)
+    IServiceProvider serviceProvider)
 {
 	private readonly IEodPriceRepository _priceRepository = priceRepository;
 	private readonly IIndicatorRepository _indicatorRepository = indicatorRepository;
 	private readonly IIndicatorEodRepository _indicatorEodRepository = indicatorEodRepository;
 	private readonly IIndicatorCalculationRunRepository _runRepository = runRepository;
-	private readonly IKeyedServiceProvider _keyedServiceProvider = keyedServiceProvider;
+    private readonly IServiceProvider _serviceProvider = serviceProvider;
 
     public async Task CalculateAsync(
 		CalculateIndicatorRequest request,
@@ -35,7 +35,7 @@ public sealed class TechnicalAnalysisService(
 		if (prices.Count == 0)
 			return;
 
-		var calculator = _keyedServiceProvider
+		var calculator = _serviceProvider
 			.GetRequiredKeyedService<IProviderIndicatorCalculator>(
 			indicator.ProviderName);
 
