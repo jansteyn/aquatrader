@@ -1,0 +1,90 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-technical-analysis-indicator-config
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              insert into technical.indicator
+              (
+                  code,
+                  name,
+                  description,
+                  provider_name,
+                  output_count
+              )
+              values
+                  ('ATR', 'Average True Range', 'Measures market volatility.', 'facioquo', 1),
+                  ('BOLLINGER_BANDS', 'Bollinger Bands', 'Measures volatility using upper and lower bands around a moving average.', 'facioquo', 3),
+                  ('EMA', 'Exponential Moving Average', 'A moving average that weights recent prices more heavily.', 'facioquo', 1),
+                  ('MACD', 'Moving Average Convergence Divergence', 'A trend-following momentum indicator.', 'facioquo', 3),
+                  ('RSI', 'Relative Strength Index', 'Measures the speed and magnitude of recent price changes.', 'facioquo', 1),
+                  ('SMA', 'Simple Moving Average', 'The arithmetic mean of prices over a specified period.', 'facioquo', 1)
+              on conflict (code) do update
+              set
+                  name = excluded.name,
+                  description = excluded.description,
+                  provider_name = excluded.provider_name,
+                  output_count = excluded.output_count;
+            splitStatements: false
+        - sql:
+            sql: |
+              insert into technical.indicator_output
+              (
+                  indicator_id,
+                  output_index,
+                  code,
+                  name
+              )
+              select
+                  i.indicator_id,
+                  o.output_index,
+                  o.code,
+                  o.name
+              from
+              (
+                  values
+                      ('ATR', 1, 'atr', 'Average True Range'),
+                      ('BOLLINGER_BANDS', 1, 'upper_band', 'Upper Band'),
+                      ('BOLLINGER_BANDS', 2, 'sma', 'Simple Moving Average'),
+                      ('BOLLINGER_BANDS', 3, 'lower_band', 'Lower Band'),
+                      ('EMA', 1, 'ema', 'Exponential Moving Average'),
+                      ('MACD', 1, 'macd', 'MACD'),
+                      ('MACD', 2, 'signal', 'Signal'),
+                      ('MACD', 3, 'histogram', 'Histogram'),
+                      ('RSI', 1, 'rsi', 'Relative Strength Index'),
+                      ('SMA', 1, 'sma', 'Simple Moving Average')
+              ) as o(indicator_code, output_index, code, name)
+              join technical.indicator i
+                on i.code = o.indicator_code
+              on conflict (indicator_id, output_index) do update
+              set
+                  code = excluded.code,
+                  name = excluded.name;
+            splitStatements: false
+        - sql:
+            sql: |
+              insert into technical.indicator_configuration
+              (
+                  indicator_id,
+                  parameters,
+                  parameters_hash
+              )
+              select
+                  i.indicator_id,
+                  c.parameters,
+                  decode(md5(c.parameters::text), 'hex')
+              from
+              (
+                  values
+                      ('ATR', '{"Period": 14}'::jsonb),
+                      ('BOLLINGER_BANDS', '{"Period": 20, "StandardDeviations": 2.0}'::jsonb),
+                      ('EMA', '{"Period": 14}'::jsonb),
+                      ('MACD', '{"FastPeriod": 12, "SlowPeriod": 26, "SignalPeriod": 9}'::jsonb),
+                      ('RSI', '{"Period": 14}'::jsonb),
+                      ('SMA', '{"Period": 14}'::jsonb)
+              ) as c(indicator_code, parameters)
+              join technical.indicator i
+                on i.code = c.indicator_code
+              on conflict (indicator_id, parameters_hash) do nothing;
+            splitStatements: false

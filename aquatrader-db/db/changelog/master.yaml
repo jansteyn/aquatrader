@@ -47,3 +47,6 @@ databaseChangeLog:
   - includeAll:
       path: "07-publications/"
       relativeToChangelogFile: true
+  - includeAll:
+      path: "08-data/"
+      relativeToChangelogFile: true
