@@ -6,7 +6,12 @@ export default mergeConfig(
     defineConfig({
         test: {
             environment: 'jsdom',
-            include: ['tests/screenerMetadata.test.ts', 'tests/**/*.component.test.tsx'],
+            include: [
+                'tests/screenerMetadata.test.ts',
+                'tests/screenerExecution.test.ts',
+                'tests/savedScreenManagement.test.ts',
+                'tests/**/*.component.test.tsx',
+            ],
             restoreMocks: true,
             pool: 'threads',
             maxWorkers: 1,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import {
     Alert,
@@ -37,7 +37,11 @@ import ContentCopyOutlinedIcon from '@mui/icons-material/ContentCopyOutlined';
 import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import type {
+    IMarketCurrenciesResponse,
+} from '../../api/aquatrader_marketTypes';
+import type {
     ScreenerEodSnapshot,
+    ScreenerFieldDefinition,
     ScreenerFilterGroup,
     ScreenerResult,
 } from './models/screener';
@@ -47,18 +51,25 @@ import {
 import { validateScreenerFilterDraft, type ScreenerFilterDraft } from './models/screenerFilterDraft';
 import { useScreenerMetadata } from './metadata/useScreenerMetadata';
 import { SCREENER_METADATA_BACKEND_STATUS } from './metadata/screenerMetadataApi';
+import { SCREENER_EXECUTION_BACKEND_STATUS } from './api/screenerExecutionApi';
+import { SAVED_SCREENS_BACKEND_STATUS } from './api/savedScreensApi';
+import { hasUnsavedScreenChanges } from './models/savedScreenManagement';
 
 function formatPrice(
     snapshot: ScreenerEodSnapshot | null,
     currencyCode: string | null,
+    currencies: readonly IMarketCurrenciesResponse[],
 ): string {
     if (snapshot?.close == null) {
         return '—';
     }
 
-    return `${snapshot.close.toLocaleString(undefined, {
-        maximumFractionDigits: 4,
-    })}${currencyCode ? ` ${currencyCode}` : ''}`;
+    const decimalPlaces = currencies.find((currency) => currency.code === currencyCode)?.decimalPlaces;
+    const precisionOptions =
+        decimalPlaces == null
+            ? { maximumFractionDigits: 8 }
+            : { minimumFractionDigits: decimalPlaces, maximumFractionDigits: decimalPlaces };
+    return `${snapshot.close.toLocaleString(undefined, precisionOptions)}${currencyCode ? ` ${currencyCode}` : ''}`;
 }
 
 export type ScreenerResultState = 'idle' | 'loading' | 'error' | 'empty' | 'ready' | 'partial';
@@ -69,6 +80,8 @@ export interface ScreenerResultsProps {
     totalCount?: number;
     error?: string;
     onRetry?: () => void;
+    currencies?: readonly IMarketCurrenciesResponse[];
+    fields?: readonly ScreenerFieldDefinition[];
 }
 
 export function ScreenerResults({
@@ -77,9 +90,12 @@ export function ScreenerResults({
     totalCount,
     error,
     onRetry,
+    currencies = [],
+    fields = [],
 }: ScreenerResultsProps) {
     const hasPartialData = results.some((result) => result.latestEod == null);
     const effectiveState = state === 'ready' && hasPartialData ? 'partial' : state;
+    const metricFieldIds = [...new Set(results.flatMap((result) => Object.keys(result.metrics)))];
 
     return (
         <Card component="section" aria-labelledby="screener-results-title">
@@ -103,7 +119,7 @@ export function ScreenerResults({
                                 : `${totalCount.toLocaleString()} matching listings`}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                            Sorting and pagination will be available when the backend supports screen execution.
+                            Sorting and pagination require the missing server-side screen execution API.
                         </Typography>
                     </Box>
                     <Chip
@@ -136,8 +152,7 @@ export function ScreenerResults({
                 )}
                 {effectiveState === 'empty' && (
                     <Alert severity="info">
-                        No matching listings. Results will appear here when a screener execution API
-                        is available.
+                        No matching listings.
                     </Alert>
                 )}
                 {effectiveState === 'idle' && (
@@ -179,6 +194,11 @@ export function ScreenerResults({
                                     <TableCell align="right">Latest close</TableCell>
                                     <TableCell align="right">Volume</TableCell>
                                     <TableCell>Price date</TableCell>
+                                    {metricFieldIds.map((fieldId) => (
+                                        <TableCell key={fieldId} align="right">
+                                            {fields.find((field) => field.fieldId === fieldId)?.label ?? fieldId}
+                                        </TableCell>
+                                    ))}
                                     <TableCell>Action</TableCell>
                                 </TableRow>
                             </TableHead>
@@ -190,12 +210,24 @@ export function ScreenerResults({
                                         <TableCell>{result.exchangeName ?? result.mic ?? '—'}</TableCell>
                                         <TableCell>{result.currencyCode ?? '—'}</TableCell>
                                         <TableCell align="right">
-                                            {formatPrice(result.latestEod, result.currencyCode)}
+                                            {formatPrice(result.latestEod, result.currencyCode, currencies)}
                                         </TableCell>
                                         <TableCell align="right">
                                             {result.latestEod?.volume?.toLocaleString() ?? '—'}
                                         </TableCell>
                                         <TableCell>{result.latestEod?.priceDate ?? '—'}</TableCell>
+                                        {metricFieldIds.map((fieldId) => {
+                                            const value = result.metrics[fieldId];
+                                            return (
+                                                <TableCell key={fieldId} align="right">
+                                                    {typeof value === 'number'
+                                                        ? value.toLocaleString()
+                                                        : value == null
+                                                          ? '—'
+                                                          : String(value)}
+                                                </TableCell>
+                                            );
+                                        })}
                                         <TableCell>
                                             <Button
                                                 component={RouterLink}
@@ -226,8 +258,35 @@ export function ScreenerPage() {
     const [notice, setNotice] = useState<string | null>(null);
     const [saveAsOpen, setSaveAsOpen] = useState(false);
     const [saveAsName, setSaveAsName] = useState('');
+    const [saveAsError, setSaveAsError] = useState<string | null>(null);
+    const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
+    const [baseline, setBaseline] = useState(() => initialScreenDraft());
     const metadata = useScreenerMetadata();
     const { exchanges, currencies, fields } = metadata;
+
+    const currentDraft = {
+        name: screenName,
+        scope: {
+            exchangeIds: selectedExchangeIds,
+            currencyCodes: selectedCurrencyCodes,
+        },
+        filters,
+        filterLogic,
+        sort: null,
+    };
+    const hasUnsavedChanges = hasUnsavedScreenChanges(currentDraft, baseline);
+
+    useEffect(() => {
+        if (!hasUnsavedChanges) {
+            return;
+        }
+        const warnBeforeUnload = (event: BeforeUnloadEvent) => {
+            event.preventDefault();
+            event.returnValue = '';
+        };
+        window.addEventListener('beforeunload', warnBeforeUnload);
+        return () => window.removeEventListener('beforeunload', warnBeforeUnload);
+    }, [hasUnsavedChanges]);
 
     function resetScreen(name = 'Untitled screen') {
         setScreenName(name);
@@ -235,7 +294,9 @@ export function ScreenerPage() {
         setFilterLogic('and');
         setSelectedExchangeIds([]);
         setSelectedCurrencyCodes([]);
-        setNotice('Started a new local screen.');
+        setBaseline(initialScreenDraft(name));
+        setNotice('Started a new screen. It has not been saved.');
+        setDiscardDialogOpen(false);
     }
 
     function saveCurrentScreen() {
@@ -252,7 +313,7 @@ export function ScreenerPage() {
             return;
         }
 
-        setNotice('Screen saved in this session only. Backend screen saving is not connected.');
+        setNotice(`${SAVED_SCREENS_BACKEND_STATUS.blocker} Your current screen remains unchanged.`);
     }
 
     function saveAsScreen() {
@@ -260,10 +321,9 @@ export function ScreenerPage() {
         if (!name) {
             return;
         }
-        setScreenName(name);
-        setSaveAsName('');
-        setSaveAsOpen(false);
-        setNotice('Screen copy created in this session only. Backend screen saving is not connected.');
+        setSaveAsError(
+            `${SAVED_SCREENS_BACKEND_STATUS.blocker} The name and current screen have been kept; nothing was saved.`,
+        );
     }
 
     const selectedExchanges = exchanges.filter((exchange) =>
@@ -312,7 +372,19 @@ export function ScreenerPage() {
                             size="small"
                             sx={{ minWidth: { sm: 210 } }}
                         />
-                        <Button variant="outlined" onClick={() => resetScreen()}>
+                        <Chip
+                            size="small"
+                            label={hasUnsavedChanges ? 'Unsaved changes' : 'New screen'}
+                            color={hasUnsavedChanges ? 'warning' : 'default'}
+                        />
+                        <Button
+                            variant="outlined"
+                            onClick={() =>
+                                hasUnsavedChanges
+                                    ? setDiscardDialogOpen(true)
+                                    : resetScreen()
+                            }
+                        >
                             New screen
                         </Button>
                         <Button
@@ -320,6 +392,7 @@ export function ScreenerPage() {
                             startIcon={<ContentCopyOutlinedIcon />}
                             onClick={() => {
                                 setSaveAsName(`${screenName} copy`);
+                                setSaveAsError(null);
                                 setSaveAsOpen(true);
                             }}
                         >
@@ -344,10 +417,37 @@ export function ScreenerPage() {
                 </Box>
 
                 <Alert severity="info" id="screener-run-unavailable">
-                    Screen execution and persistent saved screens are not available from the current
-                    backend APIs. Filters and screen actions on this page are local presentation
-                    interactions only.
+                    {SCREENER_EXECUTION_BACKEND_STATUS.blocker} The required endpoint is proposed as{' '}
+                    {SCREENER_EXECUTION_BACKEND_STATUS.proposedRoute}, but is not registered in the
+                    current backend. Existing listing and EOD endpoints cannot provide production-scale
+                    filtered, sorted, paginated results. Filter edits remain intact; execution is
+                    unavailable until the backend contract is implemented.
                 </Alert>
+
+                <Card component="section" aria-labelledby="saved-screens-title">
+                    <CardContent>
+                        <Stack spacing={1.5}>
+                            <Typography id="saved-screens-title" variant="h5" component="h2">
+                                Saved screens
+                            </Typography>
+                            <Alert severity="warning">
+                                {SAVED_SCREENS_BACKEND_STATUS.blocker} Loading, saving, renaming,
+                                duplicating, deleting, and built-in examples require the missing
+                                persistence APIs. No screens are stored in localStorage.
+                            </Alert>
+                            <Typography variant="body2" color="text.secondary">
+                                The backend exposes an authenticated user-profile endpoint, but this
+                                frontend currently does not establish or attach a bearer-token
+                                session. Saved-screen ownership must be derived by the backend from
+                                its authenticated request context; no user ID is sent by the client.
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                                Required contract: {Object.values(SAVED_SCREENS_BACKEND_STATUS.routes).join(', ')}.
+                                Predefined examples are not supported by the current backend.
+                            </Typography>
+                        </Stack>
+                    </CardContent>
+                </Card>
 
                 <Card component="section" aria-labelledby="market-scope-title">
                     <CardContent>
@@ -629,7 +729,7 @@ export function ScreenerPage() {
                     </CardContent>
                 </Card>
 
-                <ScreenerResults state="idle" />
+                <ScreenerResults state="idle" currencies={currencies} fields={fields} />
 
             </Stack>
 
@@ -644,6 +744,11 @@ export function ScreenerPage() {
                         value={saveAsName}
                         onChange={(event) => setSaveAsName(event.target.value)}
                     />
+                    {saveAsError && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {saveAsError}
+                        </Alert>
+                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setSaveAsOpen(false)}>Cancel</Button>
@@ -652,6 +757,11 @@ export function ScreenerPage() {
                     </Button>
                 </DialogActions>
             </Dialog>
+            <UnsavedChangesDialog
+                open={discardDialogOpen}
+                onCancel={() => setDiscardDialogOpen(false)}
+                onDiscard={() => resetScreen()}
+            />
             <Snackbar
                 open={!!notice}
                 autoHideDuration={5000}
@@ -659,5 +769,38 @@ export function ScreenerPage() {
                 message={notice}
             />
         </Container>
+    );
+}
+
+function initialScreenDraft(name = 'Untitled screen') {
+    return {
+        name,
+        scope: { exchangeIds: [] as number[], currencyCodes: [] as string[] },
+        filters: [] as ScreenerFilterDraft[],
+        filterLogic: 'and' as const,
+        sort: null,
+    };
+}
+
+export function UnsavedChangesDialog({
+    open,
+    onCancel,
+    onDiscard,
+}: {
+    open: boolean;
+    onCancel: () => void;
+    onDiscard: () => void;
+}) {
+    return (
+        <Dialog open={open} onClose={onCancel} aria-labelledby="discard-screen-title">
+            <DialogTitle id="discard-screen-title">Discard unsaved changes?</DialogTitle>
+            <DialogContent>
+                Your current screen has unsaved changes. Starting a new screen will discard them.
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onCancel}>Keep editing</Button>
+                <Button color="error" onClick={onDiscard}>Discard changes</Button>
+            </DialogActions>
+        </Dialog>
     );
 }

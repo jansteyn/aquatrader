@@ -283,6 +283,9 @@ export interface ExecuteScreenerRequest {
     filters: ScreenerFilterGroup;
     sort?: ScreenerSort;
     pagination?: ScreenerPaginationRequest;
+    eodDate: {
+        mode: 'latestPerListing';
+    };
 }
 
 export interface ScreenerEodSnapshot {

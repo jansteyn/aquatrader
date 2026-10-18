@@ -1,8 +1,8 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
-import { ScreenerResults } from '../src/features/screener/ScreenerPage';
+import { ScreenerResults, UnsavedChangesDialog } from '../src/features/screener/ScreenerPage';
 import { ScreenerFilterBuilder } from '../src/features/screener/components/ScreenerFilterBuilder';
 import type { ScreenerFieldDefinition, ScreenerFilterGroup } from '../src/features/screener/models/screener';
 import type { ScreenerFilterDraft } from '../src/features/screener/models/screenerFilterDraft';
@@ -115,6 +115,85 @@ describe('Screener filter metadata controls', () => {
 
         expect(screen.getByText(/No matching listings/)).toBeTruthy();
         expect(screen.queryByRole('table')).toBeNull();
+    });
+
+    it('lets users cancel or confirm discarding unsaved work', async () => {
+        const user = userEvent.setup();
+        const onCancel = vi.fn();
+        const onDiscard = vi.fn();
+        render(
+            <UnsavedChangesDialog
+                open
+                onCancel={onCancel}
+                onDiscard={onDiscard}
+            />,
+        );
+
+        expect(screen.getByText(/Your current screen has unsaved changes/)).toBeTruthy();
+        await user.click(screen.getByRole('button', { name: 'Keep editing' }));
+        expect(onCancel).toHaveBeenCalledOnce();
+        await user.click(screen.getByRole('button', { name: 'Discard changes' }));
+        expect(onDiscard).toHaveBeenCalledOnce();
+    });
+
+    it('renders listing identity, per-currency precision, dates, and returned screening metrics', () => {
+        render(
+            <MemoryRouter>
+                <ScreenerResults
+                    state="ready"
+                    totalCount={1}
+                    currencies={[{
+                        id: 1,
+                        code: 'ZZD',
+                        name: 'Example Dollar',
+                        symbol: '$',
+                        decimalPlaces: 3,
+                        isActive: true,
+                    }]}
+                    fields={[{
+                        fieldId: 'price.eod.close',
+                        label: 'Latest EOD close',
+                        valueType: 'number',
+                        category: 'price',
+                        filterable: true,
+                        operators: ['gt'],
+                    }]}
+                    results={[{
+                        listingId: 22,
+                        instrumentId: 9,
+                        symbol: 'EXM',
+                        displayName: 'Example Inc.',
+                        isin: 'ZZ0000000001',
+                        exchangeId: 4,
+                        exchangeName: 'Example Exchange',
+                        mic: 'XEXM',
+                        currencyId: 1,
+                        currencyCode: 'ZZD',
+                        marketCountryCode: 'ZZ',
+                        latestEod: {
+                            priceDate: '2026-10-16',
+                            open: 12.1,
+                            high: 13,
+                            low: 12,
+                            close: 12.5,
+                            adjustedClose: 12.5,
+                            volume: 1200,
+                        },
+                        metrics: { 'price.eod.close': 12.5 },
+                    }]}
+                />
+            </MemoryRouter>,
+        );
+
+        expect(screen.getByText('EXM')).toBeTruthy();
+        expect(screen.getByText('Example Inc.')).toBeTruthy();
+        expect(screen.getByText(/12[,.]500 ZZD/)).toBeTruthy();
+        expect(screen.getByText('2026-10-16')).toBeTruthy();
+        expect(screen.getByRole('columnheader', { name: 'Latest EOD close' })).toBeTruthy();
+        expect(screen.getAllByRole('cell').some((cell) => /12[,.]5/.test(cell.textContent ?? ''))).toBe(true);
+        expect(screen.getByRole('link', { name: 'Open chart for EXM' }).getAttribute('href')).toBe(
+            '/listing/eod-chart/22',
+        );
     });
 
     it('renders number and date inputs according to field metadata', async () => {

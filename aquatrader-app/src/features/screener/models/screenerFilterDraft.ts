@@ -48,7 +48,14 @@ export function validateScreenerFilterDraft(
             if (!filter.secondValue.trim() || !Number.isFinite(Number(filter.secondValue))) {
                 return 'Enter a valid upper value.';
             }
-            if (value > Number(filter.secondValue)) {
+            const upperValue = Number(filter.secondValue);
+            if (field.constraints?.minimum != null && upperValue < field.constraints.minimum) {
+                return `Value must be at least ${field.constraints.minimum}.`;
+            }
+            if (field.constraints?.maximum != null && upperValue > field.constraints.maximum) {
+                return `Value must be no greater than ${field.constraints.maximum}.`;
+            }
+            if (value > upperValue) {
                 return 'Lower value must not exceed upper value.';
             }
         }
@@ -66,6 +73,10 @@ export function validateScreenerFilterDraft(
                 return 'Start date must not be after end date.';
             }
         }
+    }
+
+    if (field.valueType === 'boolean' && filter.value !== 'true' && filter.value !== 'false') {
+        return 'Select Yes or No.';
     }
 
     if (field.valueType === 'text') {
