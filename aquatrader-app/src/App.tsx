@@ -16,6 +16,7 @@ import { ListingPage } from './pages/ListingPage';
 import { ListingEodChart } from './pages/Listing/ListingEodChart';
 import { LoginPage } from './pages/Auth/LoginPage';
 import { RegisterPage } from './pages/Auth/RegisterPage';
+import { ScreenerPage } from './features/screener/ScreenerPage';
 
 function LandingPage() {
   return (
@@ -122,17 +123,38 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppBar position="static" color="transparent" elevation={0} className="top-nav">
-        <Toolbar sx={{ maxWidth: 1200, width: '100%', mx: 'auto' }}>
+        <Toolbar
+          sx={{
+            maxWidth: 1200,
+            width: '100%',
+            mx: 'auto',
+            flexWrap: 'wrap',
+            py: 1,
+            gap: 1,
+          }}
+        >
           <Typography variant="h6" component={RouterLink} to="/" sx={{ textDecoration: 'none', color: 'inherit', fontWeight: 700 }}>
             AquaTrader
           </Typography>
 
-          <Box sx={{ ml: 'auto', display: 'flex', gap: 1 }}>
+          <Box
+            sx={{
+              ml: { xs: 0, sm: 'auto' },
+              width: { xs: '100%', sm: 'auto' },
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: { xs: 'center', sm: 'flex-end' },
+              gap: { xs: 0.25, sm: 1 },
+            }}
+          >
             <Button component={RouterLink} to="/" color="inherit">
               Home
             </Button>
             <Button component={RouterLink} to="/listing" color="inherit">
               ListingPage
+            </Button>
+            <Button component={RouterLink} to="/screener" color="inherit">
+              Screener
             </Button>
             <Button component={RouterLink} to="/listing/eod-chart/1?fromDate=2025-01-01&toDate=2025-01-31" color="inherit">
               ListingEoDChart
@@ -150,6 +172,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/listing" element={<ListingPage />} />
+        <Route path="/screener" element={<ScreenerPage />} />
         <Route path="/listing/eod-chart/:listingId" element={<ListingEodChartRoute />} />
         <Route path="/listing/eod-chart" element={<ListingEodChartRoute />} />
         <Route path="/login" element={<LoginPage />} />
