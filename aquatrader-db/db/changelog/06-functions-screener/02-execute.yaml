@@ -1,0 +1,290 @@
+databaseChangeLog:
+  - changeSet:
+      id: screener-execute-function
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+              CREATE OR REPLACE FUNCTION screener.execute(_request jsonb)
+              RETURNS jsonb
+              LANGUAGE plpgsql
+              STABLE
+              AS $$
+              DECLARE
+                  request_scope jsonb := COALESCE(_request->'scope', '{}'::jsonb);
+                  filter_group jsonb := _request->'filters';
+                  sort_field text := _request #>> '{sort,fieldId}';
+                  sort_direction text := COALESCE(_request #>> '{sort,direction}', 'asc');
+                  sort_type text;
+                  indicator_configuration_ids bigint[] := ARRAY[]::bigint[];
+                  page_number integer;
+                  page_size integer;
+                  requested_eod_mode text := COALESCE(_request #>> '{eodDate,mode}', 'latestPerListing');
+                  total_count bigint;
+                  response_results jsonb;
+              BEGIN
+                  IF jsonb_typeof(_request) <> 'object' THEN
+                      RAISE EXCEPTION 'Screener request must be a JSON object.'
+                          USING ERRCODE = '22023';
+                  END IF;
+                  IF NOT screener.validate_filter_group(filter_group) THEN
+                      RAISE EXCEPTION 'Filter group is empty or contains unsupported fields, operators, or values.'
+                          USING ERRCODE = '22023';
+                  END IF;
+                  WITH RECURSIVE filter_nodes(node) AS
+                  (
+                      SELECT filter_group
+                      UNION ALL
+                      SELECT child.value
+                      FROM filter_nodes parent
+                      CROSS JOIN LATERAL jsonb_array_elements(
+                          CASE WHEN jsonb_typeof(parent.node->'conditions') = 'array'
+                               THEN parent.node->'conditions'
+                               ELSE '[]'::jsonb END
+                      ) AS child(value)
+                  )
+                  SELECT COALESCE(
+                      array_agg(DISTINCT substring(node->>'fieldId'
+                          FROM '^technical[.]indicator[.]([0-9]+)[.]value[1-4]$')::bigint),
+                      ARRAY[]::bigint[]
+                  )
+                  INTO indicator_configuration_ids
+                  FROM filter_nodes
+                  WHERE node ? 'fieldId'
+                    AND node->>'fieldId' ~ '^technical[.]indicator[.][0-9]+[.]value[1-4]$';
+                  IF NOT screener.validate_scope(request_scope) THEN
+                      RAISE EXCEPTION 'Market scope contains unsupported exchanges, currencies, or countries.'
+                          USING ERRCODE = '22023';
+                  END IF;
+
+                  page_number := COALESCE((_request #>> '{pagination,page}')::integer, 1);
+                  page_size := COALESCE((_request #>> '{pagination,pageSize}')::integer, 50);
+                  IF page_number < 1 OR page_size < 1 OR page_size > 250 THEN
+                      RAISE EXCEPTION 'Page must be positive and pageSize must be between 1 and 250.'
+                          USING ERRCODE = '22023';
+                  END IF;
+                  IF requested_eod_mode <> 'latestPerListing' THEN
+                      RAISE EXCEPTION 'Unsupported EOD date mode: %', requested_eod_mode
+                          USING ERRCODE = '22023';
+                  END IF;
+                  IF sort_field IS NOT NULL THEN
+                      SELECT f.field->>'valueType' INTO sort_type
+                      FROM jsonb_array_elements(screener.get_metadata_fields()) AS f(field)
+                      WHERE f.field->>'fieldId' = sort_field
+                        AND COALESCE((f.field->>'sortable')::boolean, false);
+                      IF sort_type IS NULL OR sort_direction NOT IN ('asc', 'desc') THEN
+                          RAISE EXCEPTION 'Sort field or direction is not supported.'
+                              USING ERRCODE = '22023';
+                      END IF;
+                  END IF;
+
+                  WITH base_rows AS MATERIALIZED
+                  (
+                      SELECT
+                          l.id AS listing_id,
+                          l.instrument_id,
+                          l.symbol,
+                          l.listing_type,
+                          l.is_primary,
+                          i.name AS instrument_name,
+                          i.isin,
+                          i.instrument_type,
+                          i.sector,
+                          i.industry,
+                          e.id AS exchange_id,
+                          e.name AS exchange_name,
+                          e.mic,
+                          e.country_code,
+                          c.id AS currency_id,
+                          c.code AS currency_code,
+                          p.price_date,
+                          p.open,
+                          p.high,
+                          p.low,
+                          p.close,
+                          p.adjusted_close,
+                          p.volume,
+                          jsonb_build_object(
+                              'priceDate', p.price_date,
+                              'open', p.open,
+                              'high', p.high,
+                              'low', p.low,
+                              'close', p.close,
+                              'adjustedClose', p.adjusted_close,
+                              'volume', p.volume
+                          ) AS latest_eod,
+                          jsonb_build_object(
+                              'listing.id', l.id,
+                              'listing.symbol', l.symbol,
+                              'listing.listingType', l.listing_type,
+                              'listing.isPrimary', l.is_primary,
+                              'instrument.id', i.id,
+                              'instrument.name', i.name,
+                              'instrument.isin', i.isin,
+                              'instrument.type', i.instrument_type,
+                              'instrument.sector', i.sector,
+                              'instrument.industry', i.industry,
+                              'exchange.id', e.id,
+                              'exchange.name', e.name,
+                              'exchange.mic', e.mic,
+                              'currency.id', c.id,
+                              'currency.code', c.code,
+                              'market.countryCode', e.country_code,
+                              'price.eod.priceDate', p.price_date,
+                              'price.eod.open', p.open,
+                              'price.eod.high', p.high,
+                              'price.eod.low', p.low,
+                              'price.eod.close', p.close,
+                              'price.eod.adjustedClose', p.adjusted_close,
+                              'price.eod.volume', p.volume
+                          ) || COALESCE(indicator_values.values, '{}'::jsonb) AS screening_values
+                      FROM market.listing l
+                      JOIN market.instrument i ON i.id = l.instrument_id
+                      JOIN market.exchange e ON e.id = l.exchange_id
+                      JOIN market.currency c ON c.id = l.currency_id
+                      LEFT JOIN LATERAL
+                      (
+                          SELECT price_date, open, high, low, close, adjusted_close, volume
+                          FROM prices.price_eod pe
+                          WHERE pe.listing_id = l.id
+                          ORDER BY pe.price_date DESC
+                          LIMIT 1
+                      ) p ON true
+                      LEFT JOIN LATERAL
+                      (
+                          SELECT jsonb_object_agg(
+                              'technical.indicator.' || latest.indicator_configuration_id ||
+                                  '.value' || output.output_index,
+                              to_jsonb(CASE output.output_index
+                                  WHEN 1 THEN latest.value_1
+                                  WHEN 2 THEN latest.value_2
+                                  WHEN 3 THEN latest.value_3
+                                  WHEN 4 THEN latest.value_4
+                              END)
+                          ) AS values
+                          FROM
+                          (
+                              SELECT DISTINCT ON (ie.indicator_configuration_id)
+                                  ie.indicator_configuration_id,
+                                  ie.value_1,
+                                  ie.value_2,
+                                  ie.value_3,
+                                  ie.value_4
+                              FROM technical.indicator_eod ie
+                              WHERE ie.listing_id = l.id
+                                AND ie.indicator_configuration_id = ANY(indicator_configuration_ids)
+                              ORDER BY ie.indicator_configuration_id, ie.price_date DESC
+                          ) latest
+                          JOIN technical.indicator_configuration configuration
+                              ON configuration.indicator_configuration_id =
+                                 latest.indicator_configuration_id
+                          JOIN technical.indicator_output output
+                              ON output.indicator_id = configuration.indicator_id
+                             AND output.output_index BETWEEN 1 AND 4
+                      ) indicator_values ON true
+                      WHERE l.is_active
+                        AND i.is_active
+                        AND (COALESCE(jsonb_array_length(request_scope->'exchangeIds'), 0) = 0
+                             OR l.exchange_id IN (
+                                 SELECT value::integer
+                                 FROM jsonb_array_elements_text(request_scope->'exchangeIds')
+                             ))
+                        AND (COALESCE(jsonb_array_length(request_scope->'currencyCodes'), 0) = 0
+                             OR c.code IN (
+                                 SELECT value
+                                 FROM jsonb_array_elements_text(request_scope->'currencyCodes')
+                             ))
+                        AND (COALESCE(jsonb_array_length(request_scope->'marketCountryCodes'), 0) = 0
+                             OR e.country_code IN (
+                                 SELECT value
+                                 FROM jsonb_array_elements_text(request_scope->'marketCountryCodes')
+                             ))
+                  ),
+                  matched AS MATERIALIZED
+                  (
+                      SELECT *
+                      FROM base_rows
+                      WHERE screener.matches_filter_group(filter_group, screening_values)
+                  ),
+                  numbered AS
+                  (
+                      SELECT matched.*,
+                          count(*) OVER () AS total_rows,
+                          row_number() OVER
+                          (
+                              ORDER BY
+                                  CASE WHEN sort_type = 'number' AND sort_direction = 'asc'
+                                       THEN (screening_values->>sort_field)::numeric END ASC NULLS LAST,
+                                  CASE WHEN sort_type = 'number' AND sort_direction = 'desc'
+                                       THEN (screening_values->>sort_field)::numeric END DESC NULLS LAST,
+                                  CASE WHEN sort_type = 'date' AND sort_direction = 'asc'
+                                       THEN (screening_values->>sort_field)::date END ASC NULLS LAST,
+                                  CASE WHEN sort_type = 'date' AND sort_direction = 'desc'
+                                       THEN (screening_values->>sort_field)::date END DESC NULLS LAST,
+                                  CASE WHEN sort_type IN ('text', 'boolean') AND sort_direction = 'asc'
+                                       THEN screening_values->>sort_field END ASC NULLS LAST,
+                                  CASE WHEN sort_type IN ('text', 'boolean') AND sort_direction = 'desc'
+                                       THEN screening_values->>sort_field END DESC NULLS LAST,
+                                  CASE WHEN sort_field IS NULL THEN instrument_name END ASC,
+                                  listing_id ASC
+                          ) AS row_number
+                      FROM matched
+                  ),
+                  page_result AS
+                  (
+                      SELECT
+                          COALESCE(
+                              jsonb_agg(
+                                  jsonb_build_object(
+                                      'listingId', listing_id,
+                                      'instrumentId', instrument_id,
+                                      'symbol', symbol,
+                                      'displayName', instrument_name,
+                                      'isin', isin,
+                                      'exchangeId', exchange_id,
+                                      'exchangeName', exchange_name,
+                                      'mic', mic,
+                                      'currencyId', currency_id,
+                                      'currencyCode', currency_code,
+                                      'marketCountryCode', country_code,
+                                      'latestEod', CASE WHEN price_date IS NULL THEN NULL ELSE latest_eod END,
+                                      'metrics', screening_values - ARRAY[
+                                          'listing.id', 'listing.symbol', 'instrument.id',
+                                          'instrument.name', 'instrument.isin', 'exchange.id',
+                                          'exchange.name', 'exchange.mic', 'currency.id',
+                                          'currency.code', 'market.countryCode'
+                                      ]::text[]
+                                  )
+                                  ORDER BY row_number
+                              ),
+                              '[]'::jsonb
+                          ) AS results,
+                          COALESCE(max(total_rows), (SELECT count(*) FROM matched)) AS total_rows
+                      FROM numbered
+                      WHERE row_number > (page_number - 1) * page_size
+                        AND row_number <= page_number * page_size
+                  )
+                  SELECT results, total_rows
+                  INTO response_results, total_count
+                  FROM page_result;
+
+                  RETURN jsonb_build_object(
+                      'results', response_results,
+                      'pagination', jsonb_build_object(
+                          'page', page_number,
+                          'pageSize', page_size,
+                          'totalCount', total_count,
+                          'totalPages', CASE WHEN total_count = 0 THEN 0
+                                             ELSE ceil(total_count::numeric / page_size)::integer END,
+                          'hasNextPage', page_number * page_size < total_count
+                      )
+                  );
+              END;
+              $$;
+
+              COMMENT ON FUNCTION screener.execute(jsonb) IS '
+              HTTP POST /api/screener/execute
+              @authenticated
+              @param _request is the screen scope, typed filter tree, sort, pagination, and EOD date mode';
+            splitStatements: false

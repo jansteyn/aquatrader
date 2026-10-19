@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 06-screener-schema
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE SCHEMA IF NOT EXISTS screener AUTHORIZATION postgres;
+            splitStatements: false

@@ -1,0 +1,27 @@
+databaseChangeLog:
+  - changeSet:
+      id: 01-saved-screen-table
+      author: jan
+      changes:
+        - sql:
+            sql: |
+              CREATE TABLE IF NOT EXISTS screener.saved_screen
+              (
+                  id              uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                  user_id         bigint NOT NULL
+                                  REFERENCES core.users(id) ON DELETE CASCADE,
+                  name            varchar(120) NOT NULL,
+                  description     text,
+                  definition      jsonb NOT NULL,
+                  created_at      timestamptz NOT NULL DEFAULT now(),
+                  updated_at      timestamptz NOT NULL DEFAULT now(),
+
+                  CONSTRAINT ck_saved_screen_name
+                      CHECK (length(btrim(name)) BETWEEN 1 AND 120),
+                  CONSTRAINT ck_saved_screen_definition_object
+                      CHECK (jsonb_typeof(definition) = 'object')
+              );
+
+              CREATE INDEX IF NOT EXISTS ix_saved_screen_user_updated
+                  ON screener.saved_screen (user_id, updated_at DESC, id);
+            splitStatements: false

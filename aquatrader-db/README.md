@@ -178,6 +178,25 @@ Example:
 - Subscription Plans: insert, get, delete
 - Subscription Entitlements: insert, update, delete, get
 
+## Stock Screener API
+
+The screener migrations are registered from `db/changelog/master.yaml` and provide:
+
+- `GET /api/screener/metadata` — available listing, market, EOD, and configured indicator-output fields with types, operators, enum choices, and sorting support.
+- `POST /api/screener/execute` — validates and evaluates typed filter groups in PostgreSQL, resolves each listing's latest EOD row, uses persisted technical-indicator output values, and returns server-side sorted/paginated results with a total count.
+- Saved-screen CRUD:
+  - `GET /api/screener/saved`
+  - `POST /api/screener/saved`
+  - `GET /api/screener/saved/{id}`
+  - `PUT /api/screener/saved/{id}`
+  - `PATCH /api/screener/saved/{id}/name`
+  - `POST /api/screener/saved/{id}/duplicate`
+  - `DELETE /api/screener/saved/{id}`
+
+Every HTTP function is marked `@authenticated` in its PostgreSQL comment for NpgsqlRest discovery. Saved-screen ownership is taken from `request.user_id` in the authenticated request context; owner IDs are never accepted from request bodies. The saved definition is stored as JSONB to preserve the complete filter tree, market scope, sort order, and future supported options. No predefined examples endpoint is included.
+
+Execution requests use the frontend screener contract's camelCase JSON keys. Scope arrays may include multiple exchange IDs, currencies, and country codes. EOD metrics use the latest available price date independently for each listing. Indicator fields are keyed by configuration ID and output index and are read from `technical.indicator_eod`; the database function does not calculate indicators.
+
 ## Best Practices
 
 1. **One change per changeset**: Keep changesets focused on a single logical change

@@ -1,0 +1,489 @@
+databaseChangeLog:
+  - changeSet:
+      id: screener-metadata-functions
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+              CREATE OR REPLACE FUNCTION screener.get_metadata_fields()
+              RETURNS jsonb
+              LANGUAGE sql
+              STABLE
+              AS $$
+                  WITH definitions(field_id, label, value_type, category, operators, sortable, enum_source) AS
+                  (
+                      VALUES
+                          ('listing.id', 'Listing ID', 'number', 'listing',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('listing.symbol', 'Symbol', 'text', 'listing',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('listing.listingType', 'Listing type', 'text', 'listing',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, 'listingType'),
+                          ('listing.isPrimary', 'Primary listing', 'boolean', 'listing',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('instrument.id', 'Instrument ID', 'number', 'listing',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('instrument.name', 'Instrument name', 'text', 'listing',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('instrument.isin', 'ISIN', 'text', 'listing',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('instrument.type', 'Instrument type', 'text', 'listing',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, 'instrumentType'),
+                          ('instrument.sector', 'Sector', 'text', 'listing',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, 'sector'),
+                          ('instrument.industry', 'Industry', 'text', 'listing',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, 'industry'),
+                          ('exchange.id', 'Exchange ID', 'number', 'market',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, 'exchangeId'),
+                          ('exchange.name', 'Exchange', 'text', 'market',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, 'exchangeName'),
+                          ('exchange.mic', 'Exchange MIC', 'text', 'market',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, 'exchangeMic'),
+                          ('currency.id', 'Currency ID', 'number', 'market',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, 'currencyId'),
+                          ('currency.code', 'Currency', 'text', 'market',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, 'currencyCode'),
+                          ('market.countryCode', 'Market country', 'text', 'market',
+                           '["eq","neq","isNull","isNotNull"]'::jsonb, true, 'countryCode'),
+                          ('price.eod.priceDate', 'Latest EOD date', 'date', 'price',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('price.eod.open', 'Latest EOD open', 'number', 'price',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('price.eod.high', 'Latest EOD high', 'number', 'price',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('price.eod.low', 'Latest EOD low', 'number', 'price',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('price.eod.close', 'Latest EOD close', 'number', 'price',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('price.eod.adjustedClose', 'Latest adjusted close', 'number', 'price',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text),
+                          ('price.eod.volume', 'Latest EOD volume', 'number', 'price',
+                           '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb, true, NULL::text)
+                  ),
+                  base_fields AS
+                  (
+                      SELECT
+                          jsonb_build_object(
+                              'fieldId', d.field_id,
+                              'label', d.label,
+                              'valueType', d.value_type,
+                              'category', d.category,
+                              'filterable', true,
+                              'operators', d.operators,
+                              'sortable', d.sortable
+                          )
+                          || CASE WHEN d.enum_source IS NULL THEN '{}'::jsonb
+                                  ELSE jsonb_build_object('enumOptions', COALESCE(e.options, '[]'::jsonb))
+                             END AS field
+                      FROM definitions d
+                      LEFT JOIN LATERAL
+                      (
+                          SELECT jsonb_agg(jsonb_build_object(
+                                               'value', CASE
+                                                   WHEN d.enum_source IN ('exchangeId', 'currencyId')
+                                                       THEN to_jsonb(x.value::integer)
+                                                   ELSE to_jsonb(x.value)
+                                               END,
+                                               'label', x.label
+                                           )
+                                           ORDER BY x.label) AS options
+                          FROM
+                          (
+                              SELECT DISTINCT l.listing_type::text AS value, l.listing_type::text AS label
+                              FROM market.listing l
+                              WHERE d.enum_source = 'listingType' AND l.listing_type IS NOT NULL
+                              UNION ALL
+                              SELECT DISTINCT i.instrument_type::text, i.instrument_type::text
+                              FROM market.instrument i
+                              WHERE d.enum_source = 'instrumentType' AND i.instrument_type IS NOT NULL
+                              UNION ALL
+                              SELECT DISTINCT i.sector::text, i.sector::text
+                              FROM market.instrument i
+                              WHERE d.enum_source = 'sector' AND i.sector IS NOT NULL
+                              UNION ALL
+                              SELECT DISTINCT i.industry::text, i.industry::text
+                              FROM market.instrument i
+                              WHERE d.enum_source = 'industry' AND i.industry IS NOT NULL
+                              UNION ALL
+                              SELECT e.id::text, COALESCE(e.short_name, e.name)
+                              FROM market.exchange e
+                              WHERE d.enum_source = 'exchangeId' AND e.is_active
+                              UNION ALL
+                              SELECT DISTINCT e.name::text, e.name::text
+                              FROM market.exchange e
+                              WHERE d.enum_source = 'exchangeName' AND e.is_active
+                              UNION ALL
+                              SELECT DISTINCT e.mic::text, e.mic::text
+                              FROM market.exchange e
+                              WHERE d.enum_source = 'exchangeMic' AND e.is_active AND e.mic IS NOT NULL
+                              UNION ALL
+                              SELECT c.id::text, c.code::text
+                              FROM market.currency c
+                              WHERE d.enum_source = 'currencyId' AND c.is_active
+                              UNION ALL
+                              SELECT DISTINCT c.code::text, c.code::text
+                              FROM market.currency c
+                              WHERE d.enum_source = 'currencyCode' AND c.is_active
+                              UNION ALL
+                              SELECT DISTINCT e.country_code::text, e.country_code::text
+                              FROM market.exchange e
+                              WHERE d.enum_source = 'countryCode' AND e.is_active AND e.country_code IS NOT NULL
+                          ) x
+                      ) e ON true
+                  ),
+                  technical_fields AS
+                  (
+                      SELECT jsonb_build_object(
+                          'fieldId', 'technical.indicator.' || ic.indicator_configuration_id ||
+                                     '.value' || io.output_index,
+                          'label', i.name || ' · ' || ic.parameters::text || ' · ' || io.name,
+                          'valueType', 'number',
+                          'category', 'technicalIndicator',
+                          'filterable', true,
+                          'operators', '["eq","neq","gt","gte","lt","lte","between","isNull","isNotNull"]'::jsonb,
+                          'sortable', true,
+                          'indicator', jsonb_build_object(
+                              'indicatorId', i.indicator_id,
+                              'indicatorCode', i.code,
+                              'indicatorName', i.name,
+                              'configurationId', ic.indicator_configuration_id,
+                              'parameters', ic.parameters,
+                              'outputIndex', io.output_index,
+                              'outputSeriesName', io.name
+                          )
+                      ) AS field
+                      FROM technical.indicator_configuration ic
+                      JOIN technical.indicator i ON i.indicator_id = ic.indicator_id AND i.is_active
+                      JOIN technical.indicator_output io ON io.indicator_id = i.indicator_id
+                      WHERE io.output_index BETWEEN 1 AND 4
+                  )
+                  SELECT COALESCE(jsonb_agg(field ORDER BY field->>'fieldId'), '[]'::jsonb)
+                  FROM
+                  (
+                      SELECT field FROM base_fields
+                      UNION ALL
+                      SELECT field FROM technical_fields
+                  ) all_fields;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.matches_filter_condition(
+                  _condition jsonb,
+                  _values jsonb
+              )
+              RETURNS boolean
+              LANGUAGE plpgsql
+              IMMUTABLE
+              AS $$
+              DECLARE
+                  field_value jsonb;
+                  field_text text;
+                  operator_name text := _condition->>'operator';
+                  value_type text := _condition->>'valueType';
+                  field_id text := _condition->>'fieldId';
+              BEGIN
+                  IF field_id IS NULL OR operator_name IS NULL OR value_type IS NULL THEN
+                      RETURN false;
+                  END IF;
+
+                  field_value := _values->field_id;
+                  field_text := field_value #>> '{}';
+
+                  IF operator_name = 'isNull' THEN
+                      RETURN field_value IS NULL OR field_value = 'null'::jsonb;
+                  ELSIF operator_name = 'isNotNull' THEN
+                      RETURN field_value IS NOT NULL AND field_value <> 'null'::jsonb;
+                  END IF;
+
+                  IF field_value IS NULL OR field_value = 'null'::jsonb
+                     OR NOT (_condition ? 'value') THEN
+                      RETURN false;
+                  END IF;
+
+                  IF operator_name = 'between' THEN
+                      IF NOT (_condition ? 'secondValue') THEN
+                          RETURN false;
+                      END IF;
+                      CASE value_type
+                          WHEN 'number' THEN
+                              RETURN field_text::numeric BETWEEN
+                                  (_condition->>'value')::numeric AND (_condition->>'secondValue')::numeric;
+                          WHEN 'date' THEN
+                              RETURN field_text::date BETWEEN
+                                  (_condition->>'value')::date AND (_condition->>'secondValue')::date;
+                          ELSE
+                              RETURN false;
+                      END CASE;
+                  END IF;
+
+                  CASE value_type
+                      WHEN 'number' THEN
+                          CASE operator_name
+                              WHEN 'eq' THEN RETURN field_text::numeric = (_condition->>'value')::numeric;
+                              WHEN 'neq' THEN RETURN field_text::numeric <> (_condition->>'value')::numeric;
+                              WHEN 'gt' THEN RETURN field_text::numeric > (_condition->>'value')::numeric;
+                              WHEN 'gte' THEN RETURN field_text::numeric >= (_condition->>'value')::numeric;
+                              WHEN 'lt' THEN RETURN field_text::numeric < (_condition->>'value')::numeric;
+                              WHEN 'lte' THEN RETURN field_text::numeric <= (_condition->>'value')::numeric;
+                              ELSE RETURN false;
+                          END CASE;
+                      WHEN 'date' THEN
+                          CASE operator_name
+                              WHEN 'eq' THEN RETURN field_text::date = (_condition->>'value')::date;
+                              WHEN 'neq' THEN RETURN field_text::date <> (_condition->>'value')::date;
+                              WHEN 'gt' THEN RETURN field_text::date > (_condition->>'value')::date;
+                              WHEN 'gte' THEN RETURN field_text::date >= (_condition->>'value')::date;
+                              WHEN 'lt' THEN RETURN field_text::date < (_condition->>'value')::date;
+                              WHEN 'lte' THEN RETURN field_text::date <= (_condition->>'value')::date;
+                              ELSE RETURN false;
+                          END CASE;
+                      WHEN 'boolean' THEN
+                          CASE operator_name
+                              WHEN 'eq' THEN RETURN field_text::boolean = (_condition->>'value')::boolean;
+                              WHEN 'neq' THEN RETURN field_text::boolean <> (_condition->>'value')::boolean;
+                              ELSE RETURN false;
+                          END CASE;
+                      WHEN 'text' THEN
+                          CASE operator_name
+                              WHEN 'eq' THEN RETURN field_text = _condition->>'value';
+                              WHEN 'neq' THEN RETURN field_text <> _condition->>'value';
+                              ELSE RETURN false;
+                          END CASE;
+                      ELSE
+                          RETURN false;
+                  END CASE;
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.matches_filter_group(
+                  _group jsonb,
+                  _values jsonb
+              )
+              RETURNS boolean
+              LANGUAGE plpgsql
+              IMMUTABLE
+              AS $$
+              DECLARE
+                  logic_name text := _group->>'logic';
+                  item jsonb;
+                  matched boolean;
+                  saw_item boolean := false;
+              BEGIN
+                  IF jsonb_typeof(_group->'conditions') <> 'array'
+                     OR logic_name NOT IN ('and', 'or') THEN
+                      RETURN false;
+                  END IF;
+
+                  FOR item IN SELECT value FROM jsonb_array_elements(_group->'conditions')
+                  LOOP
+                      saw_item := true;
+                      IF item ? 'conditions' THEN
+                          matched := screener.matches_filter_group(item, _values);
+                      ELSE
+                          matched := screener.matches_filter_condition(item, _values);
+                      END IF;
+                      IF logic_name = 'and' AND NOT matched THEN
+                          RETURN false;
+                      ELSIF logic_name = 'or' AND matched THEN
+                          RETURN true;
+                      END IF;
+                  END LOOP;
+
+                  RETURN saw_item AND logic_name = 'and';
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.validate_filter_group(
+                  _group jsonb,
+                  _depth integer DEFAULT 0
+              )
+              RETURNS boolean
+              LANGUAGE plpgsql
+              STABLE
+              AS $$
+              DECLARE
+                  item jsonb;
+                  metadata jsonb := screener.get_metadata_fields();
+                  field_metadata jsonb;
+                  field_id text;
+                  operator_name text;
+                  value_type text;
+                  lower_date date;
+                  upper_date date;
+              BEGIN
+                  IF jsonb_typeof(_group) IS DISTINCT FROM 'object'
+                     OR jsonb_typeof(_group->'conditions') IS DISTINCT FROM 'array'
+                     OR jsonb_array_length(_group->'conditions') = 0
+                     OR COALESCE(_group->>'logic', '') NOT IN ('and', 'or')
+                     OR _depth > 8 THEN
+                      RETURN false;
+                  END IF;
+
+                  FOR item IN SELECT value FROM jsonb_array_elements(_group->'conditions')
+                  LOOP
+                      IF item ? 'conditions' THEN
+                          IF NOT screener.validate_filter_group(item, _depth + 1) THEN
+                              RETURN false;
+                          END IF;
+                          CONTINUE;
+                      END IF;
+
+                      field_id := item->>'fieldId';
+                      operator_name := item->>'operator';
+                      value_type := item->>'valueType';
+                      SELECT f.field INTO field_metadata
+                      FROM jsonb_array_elements(metadata) AS f(field)
+                      WHERE f.field->>'fieldId' = field_id;
+
+                      IF field_metadata IS NULL
+                         OR field_metadata->>'valueType' IS DISTINCT FROM value_type
+                         OR NOT COALESCE((field_metadata->'operators') ? operator_name, false) THEN
+                          RETURN false;
+                      END IF;
+                      IF operator_name NOT IN ('isNull', 'isNotNull')
+                         AND NOT (item ? 'value') THEN
+                          RETURN false;
+                      END IF;
+                      IF operator_name = 'between'
+                         AND (NOT (item ? 'secondValue')
+                              OR value_type NOT IN ('number', 'date')) THEN
+                          RETURN false;
+                      END IF;
+                      IF operator_name NOT IN ('isNull', 'isNotNull') THEN
+                          IF value_type = 'number' THEN
+                              IF jsonb_typeof(item->'value') IS DISTINCT FROM 'number'
+                                 OR (operator_name = 'between'
+                                     AND jsonb_typeof(item->'secondValue') IS DISTINCT FROM 'number') THEN
+                                  RETURN false;
+                              END IF;
+                              IF operator_name = 'between'
+                                 AND (item->>'value')::numeric > (item->>'secondValue')::numeric THEN
+                                  RETURN false;
+                              END IF;
+                          ELSIF value_type = 'text' THEN
+                              IF jsonb_typeof(item->'value') IS DISTINCT FROM 'string' THEN
+                                  RETURN false;
+                              END IF;
+                          ELSIF value_type = 'boolean' THEN
+                              IF jsonb_typeof(item->'value') IS DISTINCT FROM 'boolean' THEN
+                                  RETURN false;
+                              END IF;
+                          ELSIF value_type = 'date' THEN
+                              IF jsonb_typeof(item->'value') IS DISTINCT FROM 'string'
+                                 OR (item->>'value') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$'
+                                 OR (operator_name = 'between'
+                                     AND (jsonb_typeof(item->'secondValue') IS DISTINCT FROM 'string'
+                                          OR (item->>'secondValue') !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$')) THEN
+                                  RETURN false;
+                              END IF;
+                              BEGIN
+                                  lower_date := (item->>'value')::date;
+                                  IF operator_name = 'between' THEN
+                                      upper_date := (item->>'secondValue')::date;
+                                      IF lower_date > upper_date THEN
+                                          RETURN false;
+                                      END IF;
+                                  END IF;
+                              EXCEPTION
+                                  WHEN invalid_datetime_format OR datetime_field_overflow THEN
+                                      RETURN false;
+                              END;
+                          END IF;
+                          IF jsonb_typeof(field_metadata->'enumOptions') = 'array'
+                             AND jsonb_array_length(field_metadata->'enumOptions') > 0
+                             AND NOT EXISTS (
+                                 SELECT 1
+                                 FROM jsonb_array_elements(field_metadata->'enumOptions') AS options(option)
+                                 WHERE options.option->'value' = item->'value'
+                             ) THEN
+                              RETURN false;
+                          END IF;
+                      END IF;
+                  END LOOP;
+
+                  RETURN true;
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.get_metadata()
+              RETURNS jsonb
+              LANGUAGE sql
+              STABLE
+              AS $$
+                  SELECT jsonb_build_object(
+                      'fields', screener.get_metadata_fields(),
+                      'supportsFilterGroups', true,
+                      'supportsNestedGroups', true,
+                      'supportsOrGroups', true,
+                      'supportsSorting', true,
+                      'supportsPagination', true,
+                      'supportsTotalCount', true,
+                      'supportsSavedScreens', true
+                  );
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.validate_scope(_scope jsonb)
+              RETURNS boolean
+              LANGUAGE plpgsql
+              STABLE
+              AS $$
+              BEGIN
+                  IF jsonb_typeof(_scope) IS DISTINCT FROM 'object' THEN
+                      RETURN false;
+                  END IF;
+                  IF (_scope ? 'exchangeIds'
+                      AND jsonb_typeof(_scope->'exchangeIds') <> 'array')
+                     OR (_scope ? 'currencyCodes'
+                         AND jsonb_typeof(_scope->'currencyCodes') <> 'array')
+                     OR (_scope ? 'marketCountryCodes'
+                         AND jsonb_typeof(_scope->'marketCountryCodes') <> 'array') THEN
+                      RETURN false;
+                  END IF;
+                  IF EXISTS (
+                      SELECT 1 FROM jsonb_array_elements(_scope->'exchangeIds') AS values(value)
+                      WHERE jsonb_typeof(values.value) IS DISTINCT FROM 'number'
+                         OR values.value::text !~ '^[0-9]+$'
+                  ) THEN
+                      RETURN false;
+                  END IF;
+                  IF EXISTS (
+                      SELECT 1
+                      FROM jsonb_array_elements(_scope->'exchangeIds') AS values(value)
+                      WHERE NOT EXISTS (
+                          SELECT 1 FROM market.exchange exchange
+                          WHERE exchange.id = (values.value #>> '{}')::integer
+                            AND exchange.is_active
+                      )
+                  ) THEN
+                      RETURN false;
+                  END IF;
+                  IF EXISTS (
+                      SELECT 1 FROM jsonb_array_elements(_scope->'currencyCodes') AS values(value)
+                      WHERE jsonb_typeof(values.value) IS DISTINCT FROM 'string'
+                         OR NOT EXISTS (
+                             SELECT 1 FROM market.currency currency
+                             WHERE currency.code = values.value #>> '{}'
+                               AND currency.is_active
+                         )
+                  ) THEN
+                      RETURN false;
+                  END IF;
+                  IF EXISTS (
+                      SELECT 1 FROM jsonb_array_elements(_scope->'marketCountryCodes') AS values(value)
+                      WHERE jsonb_typeof(values.value) IS DISTINCT FROM 'string'
+                         OR NOT EXISTS (
+                             SELECT 1 FROM market.exchange exchange
+                             WHERE exchange.country_code = values.value #>> '{}'
+                               AND exchange.is_active
+                         )
+                  ) THEN
+                      RETURN false;
+                  END IF;
+                  RETURN true;
+              END;
+              $$;
+
+              COMMENT ON FUNCTION screener.get_metadata() IS '
+              HTTP GET /api/screener/metadata
+              @authenticated';
+            splitStatements: false

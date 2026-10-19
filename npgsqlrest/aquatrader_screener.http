@@ -1,0 +1,130 @@
+@host=http://localhost:8080
+
+// function screener.create_saved_screen(
+//     _definition jsonb
+// )
+// returns jsonb
+//
+// comment on function screener.create_saved_screen is 'HTTP POST /api/screener/saved
+// @authenticated
+// @param _definition is the complete screen definition to save';
+POST {{host}}/api/screener/saved
+content-type: application/json
+
+{
+    "the": {}
+}
+
+###
+
+// function screener.delete_saved_screen(
+//     _id uuid
+// )
+// returns jsonb
+//
+// comment on function screener.delete_saved_screen is 'HTTP DELETE /api/screener/saved/{id}
+// @authenticated';
+DELETE {{host}}/api/screener/saved/{id}
+
+###
+
+// function screener.duplicate_saved_screen(
+//     _id uuid,
+//     _request jsonb
+// )
+// returns jsonb
+//
+// comment on function screener.duplicate_saved_screen is 'HTTP POST /api/screener/saved/{id}/duplicate
+// @authenticated
+// @param _request contains the duplicate screen name';
+POST {{host}}/api/screener/saved/{id}/duplicate
+content-type: application/json
+
+{
+    "contains": {}
+}
+
+###
+
+// function screener.execute(
+//     _request jsonb
+// )
+// returns jsonb
+//
+// comment on function screener.execute is 'HTTP POST /api/screener/execute
+// @authenticated
+// @param _request is the screen scope, typed filter tree, sort, pagination, and EOD date mode';
+POST {{host}}/api/screener/execute
+content-type: application/json
+
+{
+    "the": {}
+}
+
+###
+
+// function screener.get_metadata()
+// returns jsonb
+//
+// comment on function screener.get_metadata is 'HTTP GET /api/screener/metadata
+// @authenticated';
+GET {{host}}/api/screener/metadata
+
+###
+
+// function screener.get_saved_screen(
+//     _id uuid
+// )
+// returns jsonb
+//
+// comment on function screener.get_saved_screen is 'HTTP GET /api/screener/saved/{id}
+// @authenticated';
+GET {{host}}/api/screener/saved/{id}
+
+###
+
+// function screener.list_saved_screens()
+// returns jsonb
+//
+// comment on function screener.list_saved_screens is 'HTTP GET /api/screener/saved
+// @authenticated';
+GET {{host}}/api/screener/saved
+
+###
+
+// function screener.rename_saved_screen(
+//     _id uuid,
+//     _request jsonb
+// )
+// returns jsonb
+//
+// comment on function screener.rename_saved_screen is 'HTTP PATCH /api/screener/saved/{id}/name
+// @authenticated
+// @param _request contains the replacement screen name';
+POST {{host}}/api/screener/saved/{id}/name
+content-type: application/json
+
+{
+    "contains": {}
+}
+
+###
+
+// function screener.update_saved_screen(
+//     _id uuid,
+//     _definition jsonb
+// )
+// returns jsonb
+//
+// comment on function screener.update_saved_screen is 'HTTP PUT /api/screener/saved/{id}
+// @authenticated
+// @param _definition is the complete replacement screen definition';
+PUT {{host}}/api/screener/saved/{id}
+content-type: application/json
+
+{
+    "the": {}
+}
+
+###
+

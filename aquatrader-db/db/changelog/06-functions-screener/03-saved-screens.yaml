@@ -1,0 +1,305 @@
+databaseChangeLog:
+  - changeSet:
+      id: screener-saved-screen-functions
+      author: jan
+      runOnChange: true
+      changes:
+        - sql:
+            sql: |
+              CREATE OR REPLACE FUNCTION screener.assert_saved_screen_definition(_definition jsonb)
+              RETURNS void
+              LANGUAGE plpgsql
+              STABLE
+              AS $$
+              DECLARE
+                  screen_name text;
+                  sort_field text;
+                  sort_direction text;
+              BEGIN
+                  IF jsonb_typeof(_definition) <> 'object' THEN
+                      RAISE EXCEPTION 'Screen definition must be a JSON object.'
+                          USING ERRCODE = '22023';
+                  END IF;
+
+                  screen_name := btrim(_definition->>'name');
+                  IF screen_name IS NULL OR length(screen_name) NOT BETWEEN 1 AND 120 THEN
+                      RAISE EXCEPTION 'Screen name must contain between 1 and 120 characters.'
+                          USING ERRCODE = '22023';
+                  END IF;
+                  IF jsonb_typeof(_definition->'scope') <> 'object' THEN
+                      RAISE EXCEPTION 'Screen scope must be a JSON object.'
+                          USING ERRCODE = '22023';
+                  END IF;
+                  IF NOT screener.validate_scope(_definition->'scope') THEN
+                      RAISE EXCEPTION 'Screen scope contains unsupported exchanges, currencies, or countries.'
+                          USING ERRCODE = '22023';
+                  END IF;
+                  IF NOT screener.validate_filter_group(_definition->'filters') THEN
+                      RAISE EXCEPTION 'Screen filters contain unsupported fields, operators, or values.'
+                          USING ERRCODE = '22023';
+                  END IF;
+
+                  IF _definition ? 'sort' AND _definition->'sort' <> 'null'::jsonb THEN
+                      sort_field := _definition #>> '{sort,fieldId}';
+                      sort_direction := _definition #>> '{sort,direction}';
+                      IF NOT EXISTS
+                      (
+                          SELECT 1
+                          FROM jsonb_array_elements(screener.get_metadata_fields()) AS f(field)
+                          WHERE f.field->>'fieldId' = sort_field
+                            AND COALESCE((f.field->>'sortable')::boolean, false)
+                      ) OR sort_direction NOT IN ('asc', 'desc') THEN
+                          RAISE EXCEPTION 'Screen sort field or direction is not supported.'
+                              USING ERRCODE = '22023';
+                      END IF;
+                  END IF;
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.saved_screen_json(_screen screener.saved_screen)
+              RETURNS jsonb
+              LANGUAGE sql
+              STABLE
+              AS $$
+                  SELECT (_screen).definition || jsonb_build_object(
+                      'id', (_screen).id,
+                      'name', (_screen).name,
+                      'description', (_screen).description,
+                      'createdAt', (_screen).created_at,
+                      'updatedAt', (_screen).updated_at
+                  );
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.list_saved_screens()
+              RETURNS jsonb
+              LANGUAGE plpgsql
+              STABLE
+              AS $$
+              DECLARE
+                  request_user_id bigint := NULLIF(current_setting('request.user_id', true), '')::bigint;
+                  screens jsonb;
+              BEGIN
+                  IF request_user_id IS NULL THEN
+                      RAISE EXCEPTION 'Authentication is required.'
+                          USING ERRCODE = '28000';
+                  END IF;
+
+                  SELECT COALESCE(
+                      jsonb_agg(screener.saved_screen_json(s) ORDER BY s.updated_at DESC, s.id),
+                      '[]'::jsonb
+                  )
+                  INTO screens
+                  FROM screener.saved_screen s
+                  WHERE s.user_id = request_user_id;
+                  RETURN screens;
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.get_saved_screen(_id uuid)
+              RETURNS jsonb
+              LANGUAGE plpgsql
+              STABLE
+              AS $$
+              DECLARE
+                  request_user_id bigint := NULLIF(current_setting('request.user_id', true), '')::bigint;
+                  saved_screen screener.saved_screen%ROWTYPE;
+              BEGIN
+                  IF request_user_id IS NULL THEN
+                      RAISE EXCEPTION 'Authentication is required.'
+                          USING ERRCODE = '28000';
+                  END IF;
+                  SELECT * INTO saved_screen
+                  FROM screener.saved_screen s
+                  WHERE s.id = _id AND s.user_id = request_user_id;
+                  IF NOT FOUND THEN
+                      RAISE EXCEPTION 'Saved screen was not found.'
+                          USING ERRCODE = 'P0002';
+                  END IF;
+                  RETURN screener.saved_screen_json(saved_screen);
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.create_saved_screen(_definition jsonb)
+              RETURNS jsonb
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                  request_user_id bigint := NULLIF(current_setting('request.user_id', true), '')::bigint;
+                  saved_screen screener.saved_screen%ROWTYPE;
+              BEGIN
+                  IF request_user_id IS NULL THEN
+                      RAISE EXCEPTION 'Authentication is required.'
+                          USING ERRCODE = '28000';
+                  END IF;
+                  PERFORM screener.assert_saved_screen_definition(_definition);
+
+                  INSERT INTO screener.saved_screen(user_id, name, description, definition)
+                  VALUES (
+                      request_user_id,
+                      btrim(_definition->>'name'),
+                      NULLIF(_definition->>'description', ''),
+                      _definition
+                  )
+                  RETURNING * INTO saved_screen;
+                  RETURN screener.saved_screen_json(saved_screen);
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.update_saved_screen(
+                  _id uuid,
+                  _definition jsonb
+              )
+              RETURNS jsonb
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                  request_user_id bigint := NULLIF(current_setting('request.user_id', true), '')::bigint;
+                  saved_screen screener.saved_screen%ROWTYPE;
+              BEGIN
+                  IF request_user_id IS NULL THEN
+                      RAISE EXCEPTION 'Authentication is required.'
+                          USING ERRCODE = '28000';
+                  END IF;
+                  PERFORM screener.assert_saved_screen_definition(_definition);
+
+                  UPDATE screener.saved_screen s
+                  SET name = btrim(_definition->>'name'),
+                      description = NULLIF(_definition->>'description', ''),
+                      definition = _definition,
+                      updated_at = now()
+                  WHERE s.id = _id AND s.user_id = request_user_id
+                  RETURNING * INTO saved_screen;
+                  IF NOT FOUND THEN
+                      RAISE EXCEPTION 'Saved screen was not found.'
+                          USING ERRCODE = 'P0002';
+                  END IF;
+                  RETURN screener.saved_screen_json(saved_screen);
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.rename_saved_screen(
+                  _id uuid,
+                  _request jsonb
+              )
+              RETURNS jsonb
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                  request_user_id bigint := NULLIF(current_setting('request.user_id', true), '')::bigint;
+                  new_name text := btrim(_request->>'name');
+                  saved_screen screener.saved_screen%ROWTYPE;
+              BEGIN
+                  IF request_user_id IS NULL THEN
+                      RAISE EXCEPTION 'Authentication is required.'
+                          USING ERRCODE = '28000';
+                  END IF;
+                  IF new_name IS NULL OR length(new_name) NOT BETWEEN 1 AND 120 THEN
+                      RAISE EXCEPTION 'Screen name must contain between 1 and 120 characters.'
+                          USING ERRCODE = '22023';
+                  END IF;
+
+                  UPDATE screener.saved_screen s
+                  SET name = new_name,
+                      definition = jsonb_set(s.definition, '{name}', to_jsonb(new_name), true),
+                      updated_at = now()
+                  WHERE s.id = _id AND s.user_id = request_user_id
+                  RETURNING * INTO saved_screen;
+                  IF NOT FOUND THEN
+                      RAISE EXCEPTION 'Saved screen was not found.'
+                          USING ERRCODE = 'P0002';
+                  END IF;
+                  RETURN screener.saved_screen_json(saved_screen);
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.duplicate_saved_screen(
+                  _id uuid,
+                  _request jsonb
+              )
+              RETURNS jsonb
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                  request_user_id bigint := NULLIF(current_setting('request.user_id', true), '')::bigint;
+                  new_name text := btrim(_request->>'name');
+                  source_screen screener.saved_screen%ROWTYPE;
+                  duplicate_screen screener.saved_screen%ROWTYPE;
+              BEGIN
+                  IF request_user_id IS NULL THEN
+                      RAISE EXCEPTION 'Authentication is required.'
+                          USING ERRCODE = '28000';
+                  END IF;
+                  IF new_name IS NULL OR length(new_name) NOT BETWEEN 1 AND 120 THEN
+                      RAISE EXCEPTION 'Screen name must contain between 1 and 120 characters.'
+                          USING ERRCODE = '22023';
+                  END IF;
+
+                  SELECT * INTO source_screen
+                  FROM screener.saved_screen s
+                  WHERE s.id = _id AND s.user_id = request_user_id;
+                  IF NOT FOUND THEN
+                      RAISE EXCEPTION 'Saved screen was not found.'
+                          USING ERRCODE = 'P0002';
+                  END IF;
+
+                  INSERT INTO screener.saved_screen(user_id, name, description, definition)
+                  VALUES (
+                      request_user_id,
+                      new_name,
+                      source_screen.description,
+                      jsonb_set(source_screen.definition, '{name}', to_jsonb(new_name), true)
+                  )
+                  RETURNING * INTO duplicate_screen;
+                  RETURN screener.saved_screen_json(duplicate_screen);
+              END;
+              $$;
+
+              CREATE OR REPLACE FUNCTION screener.delete_saved_screen(_id uuid)
+              RETURNS jsonb
+              LANGUAGE plpgsql
+              AS $$
+              DECLARE
+                  request_user_id bigint := NULLIF(current_setting('request.user_id', true), '')::bigint;
+                  deleted_id uuid;
+              BEGIN
+                  IF request_user_id IS NULL THEN
+                      RAISE EXCEPTION 'Authentication is required.'
+                          USING ERRCODE = '28000';
+                  END IF;
+                  DELETE FROM screener.saved_screen s
+                  WHERE s.id = _id AND s.user_id = request_user_id
+                  RETURNING s.id INTO deleted_id;
+                  IF NOT FOUND THEN
+                      RAISE EXCEPTION 'Saved screen was not found.'
+                          USING ERRCODE = 'P0002';
+                  END IF;
+                  RETURN jsonb_build_object('deleted', true, 'id', deleted_id);
+              END;
+              $$;
+
+              COMMENT ON FUNCTION screener.list_saved_screens() IS '
+              HTTP GET /api/screener/saved
+              @authenticated';
+              COMMENT ON FUNCTION screener.create_saved_screen(jsonb) IS '
+              HTTP POST /api/screener/saved
+              @authenticated
+              @param _definition is the complete screen definition to save';
+              COMMENT ON FUNCTION screener.get_saved_screen(uuid) IS '
+              HTTP GET /api/screener/saved/{id}
+              @authenticated';
+              COMMENT ON FUNCTION screener.update_saved_screen(uuid, jsonb) IS '
+              HTTP PUT /api/screener/saved/{id}
+              @authenticated
+              @param _definition is the complete replacement screen definition';
+              COMMENT ON FUNCTION screener.rename_saved_screen(uuid, jsonb) IS '
+              HTTP PATCH /api/screener/saved/{id}/name
+              @authenticated
+              @param _request contains the replacement screen name';
+              COMMENT ON FUNCTION screener.duplicate_saved_screen(uuid, jsonb) IS '
+              HTTP POST /api/screener/saved/{id}/duplicate
+              @authenticated
+              @param _request contains the duplicate screen name';
+              COMMENT ON FUNCTION screener.delete_saved_screen(uuid) IS '
+              HTTP DELETE /api/screener/saved/{id}
+              @authenticated';
+            splitStatements: false

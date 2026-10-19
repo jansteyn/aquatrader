@@ -18,6 +18,9 @@ databaseChangeLog:
       path: "03-tables-technical/"
       relativeToChangelogFile: true
   - includeAll:
+      path: "03-tables-screener/"
+      relativeToChangelogFile: true
+  - includeAll:
       path: "04-indexes-technical/"
       relativeToChangelogFile: true
   - includeAll:
@@ -43,6 +46,9 @@ databaseChangeLog:
       relativeToChangelogFile: true
   - includeAll:
       path: "06-functions-technical/"
+      relativeToChangelogFile: true
+  - includeAll:
+      path: "06-functions-screener/"
       relativeToChangelogFile: true
   - includeAll:
       path: "07-publications/"
