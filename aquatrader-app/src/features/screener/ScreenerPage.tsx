@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Alert,
     Accordion,
@@ -40,10 +41,16 @@ import type {
     IMarketCurrenciesResponse,
 } from '../../api/aquatrader_marketTypes';
 import type {
+    ExecuteScreenerRequest,
+    ExecuteScreenerResponse,
+    ScreenerComparisonOperator,
+    ScreenerDefinition,
+    ScreenerFilterCondition,
+    ScreenerFilterGroup,
     ScreenerEodSnapshot,
     ScreenerFieldDefinition,
-    ScreenerFilterGroup,
     ScreenerResult,
+    ScreenerSort,
 } from './models/screener';
 import {
     ScreenerFilterBuilder,
@@ -51,9 +58,240 @@ import {
 import { validateScreenerFilterDraft, type ScreenerFilterDraft } from './models/screenerFilterDraft';
 import { useScreenerMetadata } from './metadata/useScreenerMetadata';
 import { SCREENER_METADATA_BACKEND_STATUS } from './metadata/screenerMetadataApi';
-import { SCREENER_EXECUTION_BACKEND_STATUS } from './api/screenerExecutionApi';
-import { SAVED_SCREENS_BACKEND_STATUS } from './api/savedScreensApi';
+import type { SavedScreenerDefinition } from './api/savedScreensApi';
 import { hasUnsavedScreenChanges } from './models/savedScreenManagement';
+import {
+    screenerScreenerExecute,
+    screenerScreenerSaved,
+    screenerScreenerSaved1,
+    screenerScreenerSavedId,
+    screenerScreenerSavedId1,
+    screenerScreenerSavedId2,
+    screenerScreenerSavedIdDuplicate,
+    screenerScreenerSavedIdName,
+} from '../../api/aquatrader_screener';
+
+const SAVED_SCREENS_QUERY_KEY = ['screener', 'saved'] as const;
+const DEFAULT_PAGE_SIZE = 50;
+
+interface ScreenDraftSnapshot {
+    id: string | null;
+    name: string;
+    scope: {
+        exchangeIds: number[];
+        currencyCodes: string[];
+        marketCountryCodes: string[];
+    };
+    filters: ScreenerFilterDraft[];
+    filterLogic: ScreenerFilterGroup['logic'];
+    sort: ScreenerSort | null;
+}
+
+type ScreenerApiResult<T> = {
+    status: number;
+    response: T;
+    error?: { title?: string; detail?: string | null } | undefined;
+};
+
+function requireScreenerApiSuccess<T>(result: ScreenerApiResult<T>): T {
+    if (result.status < 200 || result.status >= 300) {
+        throw new Error(
+            result.error?.detail ??
+                result.error?.title ??
+                `Screener request failed (HTTP ${result.status}).`,
+        );
+    }
+    return result.response;
+}
+
+function isSavedScreenerDefinition(value: unknown): value is SavedScreenerDefinition {
+    if (typeof value !== 'object' || value === null) {
+        return false;
+    }
+    const definition = value as Record<string, unknown>;
+    const scope = definition.scope;
+    const filters = definition.filters;
+    if (
+        typeof scope !== 'object' ||
+        scope === null ||
+        typeof filters !== 'object' ||
+        filters === null
+    ) {
+        return false;
+    }
+    const screenScope = scope as Record<string, unknown>;
+    const filterGroup = filters as Record<string, unknown>;
+    return (
+        typeof definition.id === 'string' &&
+        typeof definition.name === 'string' &&
+        (screenScope.exchangeIds === undefined ||
+            (Array.isArray(screenScope.exchangeIds) &&
+                screenScope.exchangeIds.every((id) => typeof id === 'number'))) &&
+        (screenScope.currencyCodes === undefined ||
+            (Array.isArray(screenScope.currencyCodes) &&
+                screenScope.currencyCodes.every((code) => typeof code === 'string'))) &&
+        (screenScope.marketCountryCodes === undefined ||
+            (Array.isArray(screenScope.marketCountryCodes) &&
+                screenScope.marketCountryCodes.every((code) => typeof code === 'string'))) &&
+        (filterGroup.logic === 'and' || filterGroup.logic === 'or') &&
+        Array.isArray(filterGroup.conditions)
+    );
+}
+
+function readSavedScreenerDefinition(value: unknown): SavedScreenerDefinition {
+    if (!isSavedScreenerDefinition(value)) {
+        throw new Error('The screener API returned an invalid saved screen.');
+    }
+    return value;
+}
+
+function readSavedScreenerList(value: unknown): readonly SavedScreenerDefinition[] {
+    if (!Array.isArray(value)) {
+        throw new Error('The screener API returned an invalid saved-screen list.');
+    }
+    return value.map(readSavedScreenerDefinition);
+}
+
+function readExecutionResponse(value: unknown): ExecuteScreenerResponse {
+    if (
+        typeof value !== 'object' ||
+        value === null ||
+        !Array.isArray((value as Partial<ExecuteScreenerResponse>).results)
+    ) {
+        throw new Error('The screener API returned invalid results.');
+    }
+    return value as ExecuteScreenerResponse;
+}
+
+function createFilterGroup(
+    filters: readonly ScreenerFilterDraft[],
+    logic: ScreenerFilterGroup['logic'],
+    fields: readonly ScreenerFieldDefinition[],
+): ScreenerFilterGroup {
+    const conditions = filters.map((filter): ScreenerFilterCondition => {
+        const validationError = validateScreenerFilterDraft(filter, fields);
+        if (validationError) {
+            const field = fields.find((item) => item.fieldId === filter.fieldId);
+            throw new Error(`${field?.label ?? filter.fieldId}: ${validationError}`);
+        }
+
+        const field = fields.find((item) => item.fieldId === filter.fieldId);
+        if (!field) {
+            throw new Error(`Unknown screener field "${filter.fieldId}".`);
+        }
+        if (filter.operator === 'isNull' || filter.operator === 'isNotNull') {
+            return { fieldId: filter.fieldId, valueType: field.valueType, operator: filter.operator };
+        }
+        if (filter.operator === 'between') {
+            if (field.valueType === 'number') {
+                return {
+                    fieldId: filter.fieldId,
+                    valueType: field.valueType,
+                    operator: filter.operator,
+                    value: Number(filter.value),
+                    secondValue: Number(filter.secondValue),
+                };
+            }
+            if (field.valueType === 'date') {
+                return {
+                    fieldId: filter.fieldId,
+                    valueType: field.valueType,
+                    operator: filter.operator,
+                    value: filter.value,
+                    secondValue: filter.secondValue,
+                };
+            }
+            throw new Error(`The between operator is not valid for "${field.label}".`);
+        }
+        if (field.valueType === 'number') {
+            if (!isComparisonOperator(filter.operator)) {
+                throw new Error(`The selected operator is not valid for "${field.label}".`);
+            }
+            return {
+                fieldId: filter.fieldId,
+                valueType: field.valueType,
+                operator: filter.operator,
+                value: Number(filter.value),
+            };
+        }
+        if (field.valueType === 'date') {
+            if (!isComparisonOperator(filter.operator)) {
+                throw new Error(`The selected operator is not valid for "${field.label}".`);
+            }
+            return {
+                fieldId: filter.fieldId,
+                valueType: field.valueType,
+                operator: filter.operator,
+                value: filter.value,
+            };
+        }
+        if (field.valueType === 'boolean') {
+            if (filter.operator !== 'eq' && filter.operator !== 'neq') {
+                throw new Error(`The selected operator is not valid for "${field.label}".`);
+            }
+            return {
+                fieldId: filter.fieldId,
+                valueType: field.valueType,
+                operator: filter.operator,
+                value: filter.value === 'true',
+            };
+        }
+        if (filter.operator !== 'eq' && filter.operator !== 'neq') {
+            throw new Error(`The selected operator is not valid for "${field.label}".`);
+        }
+        return {
+            fieldId: filter.fieldId,
+            valueType: field.valueType,
+            operator: filter.operator,
+            value: filter.value,
+        };
+    });
+    return { logic, conditions };
+}
+
+function isComparisonOperator(
+    operator: ScreenerFilterDraft['operator'],
+): operator is ScreenerComparisonOperator {
+    return (
+        operator === 'eq' ||
+        operator === 'neq' ||
+        operator === 'gt' ||
+        operator === 'gte' ||
+        operator === 'lt' ||
+        operator === 'lte'
+    );
+}
+
+function createScreenDefinition(
+    name: string,
+    scope: ScreenerDefinition['scope'],
+    filters: readonly ScreenerFilterDraft[],
+    filterLogic: ScreenerFilterGroup['logic'],
+    sort: ScreenerSort | null,
+    fields: readonly ScreenerFieldDefinition[],
+): ScreenerDefinition {
+    return {
+        name: name.trim(),
+        scope,
+        filters: createFilterGroup(filters, filterLogic, fields),
+        ...(sort ? { sort } : {}),
+    };
+}
+
+function flattenSavedFilters(group: ScreenerFilterGroup): ScreenerFilterDraft[] {
+    return group.conditions.map((condition, index) => {
+        if ('logic' in condition) {
+            throw new Error('Nested saved-screen filters are not supported by this editor.');
+        }
+        return {
+            id: index + 1,
+            fieldId: condition.fieldId,
+            operator: condition.operator,
+            value: 'value' in condition ? String(condition.value) : '',
+            secondValue: 'secondValue' in condition ? String(condition.secondValue) : '',
+        };
+    });
+}
 
 function formatPrice(
     snapshot: ScreenerEodSnapshot | null,
@@ -119,13 +357,21 @@ export function ScreenerResults({
                                 : `${totalCount.toLocaleString()} matching listings`}
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                            Sorting and pagination require the missing server-side screen execution API.
+                            Results are sorted and paginated by the screener service.
                         </Typography>
                     </Box>
                     <Chip
                         size="small"
-                        label="Execution unavailable"
-                        color="warning"
+                        label={
+                            effectiveState === 'loading'
+                                ? 'Running'
+                                : effectiveState === 'error'
+                                  ? 'Execution failed'
+                                  : effectiveState === 'idle'
+                                    ? 'Not run'
+                                    : 'Execution complete'
+                        }
+                        color={effectiveState === 'error' ? 'error' : 'default'}
                         variant="outlined"
                     />
                 </Stack>
@@ -171,8 +417,7 @@ export function ScreenerResults({
                             No results yet
                         </Typography>
                         <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                            Run a screen to see matching listings. Screen execution is not connected
-                            yet.
+                            Run a screen to see matching listings.
                         </Typography>
                     </Box>
                 )}
@@ -250,29 +495,90 @@ export function ScreenerResults({
 }
 
 export function ScreenerPage() {
+    const queryClient = useQueryClient();
     const [screenName, setScreenName] = useState('Untitled screen');
+    const [activeSavedScreenId, setActiveSavedScreenId] = useState<string | null>(null);
     const [filters, setFilters] = useState<ScreenerFilterDraft[]>([]);
     const [filterLogic, setFilterLogic] = useState<ScreenerFilterGroup['logic']>('and');
     const [selectedExchangeIds, setSelectedExchangeIds] = useState<number[]>([]);
     const [selectedCurrencyCodes, setSelectedCurrencyCodes] = useState<string[]>([]);
+    const [selectedMarketCountryCodes, setSelectedMarketCountryCodes] = useState<string[]>([]);
+    const [sort, setSort] = useState<ScreenerSort | null>(null);
     const [notice, setNotice] = useState<string | null>(null);
     const [saveAsOpen, setSaveAsOpen] = useState(false);
     const [saveAsName, setSaveAsName] = useState('');
     const [saveAsError, setSaveAsError] = useState<string | null>(null);
+    const [saveAsSourceId, setSaveAsSourceId] = useState<string | null>(null);
+    const [renameTarget, setRenameTarget] = useState<SavedScreenerDefinition | null>(null);
+    const [renameName, setRenameName] = useState('');
+    const [renameError, setRenameError] = useState<string | null>(null);
+    const [deleteTarget, setDeleteTarget] = useState<SavedScreenerDefinition | null>(null);
+    const [resultState, setResultState] = useState<ScreenerResultState>('idle');
+    const [results, setResults] = useState<readonly ScreenerResult[]>([]);
+    const [totalCount, setTotalCount] = useState<number | undefined>();
+    const [executionError, setExecutionError] = useState<string>();
     const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
-    const [baseline, setBaseline] = useState(() => initialScreenDraft());
+    const [pendingLoadId, setPendingLoadId] = useState<string | null>(null);
+    const [baseline, setBaseline] = useState<ScreenDraftSnapshot>(() => initialScreenDraft());
     const metadata = useScreenerMetadata();
     const { exchanges, currencies, fields } = metadata;
+    const savedScreensQuery = useQuery({
+        queryKey: SAVED_SCREENS_QUERY_KEY,
+        queryFn: async () =>
+            readSavedScreenerList(
+                requireScreenerApiSuccess(await screenerScreenerSaved1()),
+            ),
+    });
+    const createSavedScreen = useMutation({
+        mutationFn: async (definition: ScreenerDefinition) =>
+            readSavedScreenerDefinition(
+                requireScreenerApiSuccess(await screenerScreenerSaved({ the: definition })),
+            ),
+    });
+    const updateSavedScreen = useMutation({
+        mutationFn: async ({ id, definition }: { id: string; definition: ScreenerDefinition }) =>
+            readSavedScreenerDefinition(
+                requireScreenerApiSuccess(await screenerScreenerSavedId2({ id, the: definition })),
+            ),
+    });
+    const renameSavedScreen = useMutation({
+        mutationFn: async ({ id, name }: { id: string; name: string }) =>
+            readSavedScreenerDefinition(
+                requireScreenerApiSuccess(
+                    await screenerScreenerSavedIdName({ id, contains: { name } }),
+                ),
+            ),
+    });
+    const duplicateSavedScreen = useMutation({
+        mutationFn: async ({ id, name }: { id: string; name: string }) =>
+            readSavedScreenerDefinition(
+                requireScreenerApiSuccess(
+                    await screenerScreenerSavedIdDuplicate({ id, contains: { name } }),
+                ),
+            ),
+    });
+    const deleteSavedScreen = useMutation({
+        mutationFn: async (id: string) =>
+            requireScreenerApiSuccess(await screenerScreenerSavedId({ id })),
+    });
+    const executeScreener = useMutation({
+        mutationFn: async (request: ExecuteScreenerRequest) =>
+            readExecutionResponse(
+                requireScreenerApiSuccess(await screenerScreenerExecute({ the: request })),
+            ),
+    });
 
     const currentDraft = {
+        id: activeSavedScreenId,
         name: screenName,
         scope: {
             exchangeIds: selectedExchangeIds,
             currencyCodes: selectedCurrencyCodes,
+            marketCountryCodes: selectedMarketCountryCodes,
         },
         filters,
         filterLogic,
-        sort: null,
+        sort,
     };
     const hasUnsavedChanges = hasUnsavedScreenChanges(currentDraft, baseline);
 
@@ -289,41 +595,227 @@ export function ScreenerPage() {
     }, [hasUnsavedChanges]);
 
     function resetScreen(name = 'Untitled screen') {
+        setActiveSavedScreenId(null);
         setScreenName(name);
         setFilters([]);
         setFilterLogic('and');
         setSelectedExchangeIds([]);
         setSelectedCurrencyCodes([]);
+        setSelectedMarketCountryCodes([]);
+        setSort(null);
         setBaseline(initialScreenDraft(name));
         setNotice('Started a new screen. It has not been saved.');
         setDiscardDialogOpen(false);
+        setPendingLoadId(null);
     }
 
-    function saveCurrentScreen() {
-        const screenErrors = filters.flatMap((filter) => {
-            const error = validateScreenerFilterDraft(filter, fields);
-            const field = fields.find((item) => item.fieldId === filter.fieldId);
-            return error ? [`${field?.label ?? filter.fieldId}: ${error}`] : [];
-        });
-        if (!screenName.trim()) {
-            screenErrors.unshift('Enter a screen name before saving.');
-        }
-        if (screenErrors.length > 0) {
-            setNotice(screenErrors[0]);
+    function requestNewScreen() {
+        if (hasUnsavedChanges) {
+            setPendingLoadId(null);
+            setDiscardDialogOpen(true);
             return;
         }
-
-        setNotice(`${SAVED_SCREENS_BACKEND_STATUS.blocker} Your current screen remains unchanged.`);
+        resetScreen();
     }
 
-    function saveAsScreen() {
+    function currentScreenDefinition(name = screenName): ScreenerDefinition {
+        if (!name.trim()) {
+            throw new Error('Enter a screen name before saving.');
+        }
+        return createScreenDefinition(
+            name,
+            currentDraft.scope,
+            filters,
+            filterLogic,
+            sort,
+            fields,
+        );
+    }
+
+    function updateBaseline(id: string | null, name = screenName) {
+        setBaseline({
+            id,
+            name,
+            scope: {
+                exchangeIds: [...selectedExchangeIds],
+                currencyCodes: [...selectedCurrencyCodes],
+                marketCountryCodes: [...selectedMarketCountryCodes],
+            },
+            filters: filters.map((filter) => ({ ...filter })),
+            filterLogic,
+            sort,
+        });
+    }
+
+    async function saveCurrentScreen() {
+        try {
+            const definition = currentScreenDefinition();
+            const savedScreen = activeSavedScreenId
+                ? await updateSavedScreen.mutateAsync({
+                      id: activeSavedScreenId,
+                      definition,
+                  })
+                : await createSavedScreen.mutateAsync(definition);
+            setActiveSavedScreenId(savedScreen.id);
+            setScreenName(savedScreen.name);
+            updateBaseline(savedScreen.id, savedScreen.name);
+            await queryClient.invalidateQueries({ queryKey: SAVED_SCREENS_QUERY_KEY });
+            setNotice(`Saved "${savedScreen.name}".`);
+        } catch (error) {
+            setNotice(error instanceof Error ? error.message : 'Unable to save this screen.');
+        }
+    }
+
+    function requestLoadSavedScreen(id: string) {
+        if (hasUnsavedChanges) {
+            setPendingLoadId(id);
+            setDiscardDialogOpen(true);
+            return;
+        }
+        void loadSavedScreen(id);
+    }
+
+    function discardPendingScreenChanges() {
+        const loadId = pendingLoadId;
+        setPendingLoadId(null);
+        setDiscardDialogOpen(false);
+        if (loadId) {
+            void loadSavedScreen(loadId);
+        } else {
+            resetScreen();
+        }
+    }
+
+    async function saveAsScreen() {
         const name = saveAsName.trim();
         if (!name) {
             return;
         }
-        setSaveAsError(
-            `${SAVED_SCREENS_BACKEND_STATUS.blocker} The name and current screen have been kept; nothing was saved.`,
-        );
+        try {
+            if (saveAsSourceId) {
+                const duplicate = await duplicateSavedScreen.mutateAsync({
+                    id: saveAsSourceId,
+                    name,
+                });
+                await queryClient.invalidateQueries({ queryKey: SAVED_SCREENS_QUERY_KEY });
+                setSaveAsOpen(false);
+                setSaveAsSourceId(null);
+                setNotice(`Created "${duplicate.name}".`);
+                return;
+            }
+
+            const definition = currentScreenDefinition(name);
+            const savedScreen = await createSavedScreen.mutateAsync(definition);
+            setActiveSavedScreenId(savedScreen.id);
+            setScreenName(savedScreen.name);
+            updateBaseline(savedScreen.id, savedScreen.name);
+            await queryClient.invalidateQueries({ queryKey: SAVED_SCREENS_QUERY_KEY });
+            setSaveAsOpen(false);
+            setNotice(`Saved "${savedScreen.name}".`);
+        } catch (error) {
+            setSaveAsError(error instanceof Error ? error.message : 'Unable to save this screen.');
+        }
+    }
+
+    async function loadSavedScreen(id: string) {
+        try {
+            const savedScreen = readSavedScreenerDefinition(
+                requireScreenerApiSuccess(await screenerScreenerSavedId1({ id })),
+            );
+            const nextFilters = flattenSavedFilters(savedScreen.filters);
+            const nextScope = savedScreen.scope;
+            const nextExchangeIds = [...(nextScope.exchangeIds ?? [])];
+            const nextCurrencyCodes = [...(nextScope.currencyCodes ?? [])];
+            const nextMarketCountryCodes = [...(nextScope.marketCountryCodes ?? [])];
+            setActiveSavedScreenId(savedScreen.id);
+            setScreenName(savedScreen.name);
+            setFilters(nextFilters);
+            setFilterLogic(savedScreen.filters.logic);
+            setSelectedExchangeIds(nextExchangeIds);
+            setSelectedCurrencyCodes(nextCurrencyCodes);
+            setSelectedMarketCountryCodes(nextMarketCountryCodes);
+            setSort(savedScreen.sort ?? null);
+            setBaseline({
+                id: savedScreen.id,
+                name: savedScreen.name,
+                scope: {
+                    exchangeIds: nextExchangeIds,
+                    currencyCodes: nextCurrencyCodes,
+                    marketCountryCodes: nextMarketCountryCodes,
+                },
+                filters: nextFilters,
+                filterLogic: savedScreen.filters.logic,
+                sort: savedScreen.sort ?? null,
+            });
+            setResultState('idle');
+            setResults([]);
+            setTotalCount(undefined);
+            setNotice(`Loaded "${savedScreen.name}".`);
+        } catch (error) {
+            setNotice(error instanceof Error ? error.message : 'Unable to load this screen.');
+        }
+    }
+
+    async function saveRename() {
+        if (!renameTarget || !renameName.trim()) {
+            return;
+        }
+        try {
+            const renamed = await renameSavedScreen.mutateAsync({
+                id: renameTarget.id,
+                name: renameName.trim(),
+            });
+            if (activeSavedScreenId === renamed.id) {
+                setScreenName(renamed.name);
+                updateBaseline(renamed.id, renamed.name);
+            }
+            await queryClient.invalidateQueries({ queryKey: SAVED_SCREENS_QUERY_KEY });
+            setRenameTarget(null);
+            setNotice(`Renamed screen to "${renamed.name}".`);
+        } catch (error) {
+            setRenameError(error instanceof Error ? error.message : 'Unable to rename this screen.');
+        }
+    }
+
+    async function confirmDeleteSavedScreen() {
+        if (!deleteTarget) {
+            return;
+        }
+        try {
+            await deleteSavedScreen.mutateAsync(deleteTarget.id);
+            if (activeSavedScreenId === deleteTarget.id) {
+                setActiveSavedScreenId(null);
+            }
+            await queryClient.invalidateQueries({ queryKey: SAVED_SCREENS_QUERY_KEY });
+            setNotice(`Deleted "${deleteTarget.name}".`);
+            setDeleteTarget(null);
+        } catch (error) {
+            setNotice(error instanceof Error ? error.message : 'Unable to delete this screen.');
+        }
+    }
+
+    async function runScreen() {
+        setResultState('loading');
+        setExecutionError(undefined);
+        setResults([]);
+        setTotalCount(undefined);
+        try {
+            const definition = currentScreenDefinition();
+            const request: ExecuteScreenerRequest = {
+                scope: definition.scope,
+                filters: definition.filters,
+                ...(definition.sort ? { sort: definition.sort } : {}),
+                pagination: { page: 1, pageSize: DEFAULT_PAGE_SIZE },
+                eodDate: { mode: 'latestPerListing' },
+            };
+            const response = await executeScreener.mutateAsync(request);
+            setResults(response.results);
+            setTotalCount(response.pagination?.totalCount);
+            setResultState(response.results.length === 0 ? 'empty' : 'ready');
+        } catch (error) {
+            setExecutionError(error instanceof Error ? error.message : 'Unable to run this screen.');
+            setResultState('error');
+        }
     }
 
     const selectedExchanges = exchanges.filter((exchange) =>
@@ -374,16 +866,18 @@ export function ScreenerPage() {
                         />
                         <Chip
                             size="small"
-                            label={hasUnsavedChanges ? 'Unsaved changes' : 'New screen'}
+                            label={
+                                hasUnsavedChanges
+                                    ? 'Unsaved changes'
+                                    : activeSavedScreenId
+                                      ? 'Saved screen'
+                                      : 'New screen'
+                            }
                             color={hasUnsavedChanges ? 'warning' : 'default'}
                         />
                         <Button
                             variant="outlined"
-                            onClick={() =>
-                                hasUnsavedChanges
-                                    ? setDiscardDialogOpen(true)
-                                    : resetScreen()
-                            }
+                            onClick={requestNewScreen}
                         >
                             New screen
                         </Button>
@@ -393,6 +887,7 @@ export function ScreenerPage() {
                             onClick={() => {
                                 setSaveAsName(`${screenName} copy`);
                                 setSaveAsError(null);
+                                setSaveAsSourceId(null);
                                 setSaveAsOpen(true);
                             }}
                         >
@@ -402,27 +897,20 @@ export function ScreenerPage() {
                             variant="outlined"
                             startIcon={<SaveOutlinedIcon />}
                             onClick={saveCurrentScreen}
+                            disabled={createSavedScreen.isPending || updateSavedScreen.isPending}
                         >
                             Save
                         </Button>
                         <Button
                             variant="contained"
                             startIcon={<PlayArrowIcon />}
-                            disabled
-                            aria-describedby="screener-run-unavailable"
+                            onClick={() => void runScreen()}
+                            disabled={executeScreener.isPending}
                         >
-                            Run Screen
+                            {executeScreener.isPending ? 'Running…' : 'Run Screen'}
                         </Button>
                     </Stack>
                 </Box>
-
-                <Alert severity="info" id="screener-run-unavailable">
-                    {SCREENER_EXECUTION_BACKEND_STATUS.blocker} The required endpoint is proposed as{' '}
-                    {SCREENER_EXECUTION_BACKEND_STATUS.proposedRoute}, but is not registered in the
-                    current backend. Existing listing and EOD endpoints cannot provide production-scale
-                    filtered, sorted, paginated results. Filter edits remain intact; execution is
-                    unavailable until the backend contract is implemented.
-                </Alert>
 
                 <Card component="section" aria-labelledby="saved-screens-title">
                     <CardContent>
@@ -430,21 +918,95 @@ export function ScreenerPage() {
                             <Typography id="saved-screens-title" variant="h5" component="h2">
                                 Saved screens
                             </Typography>
-                            <Alert severity="warning">
-                                {SAVED_SCREENS_BACKEND_STATUS.blocker} Loading, saving, renaming,
-                                duplicating, deleting, and built-in examples require the missing
-                                persistence APIs. No screens are stored in localStorage.
-                            </Alert>
-                            <Typography variant="body2" color="text.secondary">
-                                The backend exposes an authenticated user-profile endpoint, but this
-                                frontend currently does not establish or attach a bearer-token
-                                session. Saved-screen ownership must be derived by the backend from
-                                its authenticated request context; no user ID is sent by the client.
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Required contract: {Object.values(SAVED_SCREENS_BACKEND_STATUS.routes).join(', ')}.
-                                Predefined examples are not supported by the current backend.
-                            </Typography>
+                            {savedScreensQuery.isPending && (
+                                <Stack direction="row" spacing={1.5} role="status" sx={{ alignItems: 'center' }}>
+                                    <CircularProgress size={18} />
+                                    <Typography>Loading saved screens…</Typography>
+                                </Stack>
+                            )}
+                            {savedScreensQuery.error && (
+                                <Alert
+                                    severity="error"
+                                    action={
+                                        <Button
+                                            color="inherit"
+                                            size="small"
+                                            onClick={() => void savedScreensQuery.refetch()}
+                                        >
+                                            Retry
+                                        </Button>
+                                    }
+                                >
+                                    {savedScreensQuery.error instanceof Error
+                                        ? savedScreensQuery.error.message
+                                        : 'Unable to load saved screens.'}
+                                </Alert>
+                            )}
+                            {savedScreensQuery.data?.length === 0 && (
+                                <Typography color="text.secondary">
+                                    No saved screens yet.
+                                </Typography>
+                            )}
+                            {savedScreensQuery.data?.map((savedScreen) => (
+                                <Stack
+                                    key={savedScreen.id}
+                                    direction={{ xs: 'column', md: 'row' }}
+                                    spacing={1}
+                                    sx={{
+                                        alignItems: { xs: 'stretch', md: 'center' },
+                                        justifyContent: 'space-between',
+                                        p: 1.25,
+                                        border: 1,
+                                        borderColor:
+                                            savedScreen.id === activeSavedScreenId ? 'primary.main' : 'divider',
+                                        borderRadius: 1,
+                                    }}
+                                >
+                                    <Box>
+                                        <Typography sx={{ fontWeight: 600 }}>{savedScreen.name}</Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            {savedScreen.filters.conditions.length} top-level filter
+                                            {savedScreen.filters.conditions.length === 1 ? '' : 's'}
+                                        </Typography>
+                                    </Box>
+                                    <Stack direction="row" spacing={0.5} useFlexGap sx={{ flexWrap: 'wrap' }}>
+                                        <Button
+                                            size="small"
+                                            onClick={() => requestLoadSavedScreen(savedScreen.id)}
+                                        >
+                                            Load
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            onClick={() => {
+                                                setRenameTarget(savedScreen);
+                                                setRenameName(savedScreen.name);
+                                                setRenameError(null);
+                                            }}
+                                        >
+                                            Rename
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            onClick={() => {
+                                                setSaveAsSourceId(savedScreen.id);
+                                                setSaveAsName(`${savedScreen.name} copy`);
+                                                setSaveAsError(null);
+                                                setSaveAsOpen(true);
+                                            }}
+                                        >
+                                            Duplicate
+                                        </Button>
+                                        <Button
+                                            size="small"
+                                            color="error"
+                                            onClick={() => setDeleteTarget(savedScreen)}
+                                        >
+                                            Delete
+                                        </Button>
+                                    </Stack>
+                                </Stack>
+                            ))}
                         </Stack>
                     </CardContent>
                 </Card>
@@ -729,20 +1291,29 @@ export function ScreenerPage() {
                     </CardContent>
                 </Card>
 
-                <ScreenerResults state="idle" currencies={currencies} fields={fields} />
+                <ScreenerResults
+                    state={resultState}
+                    results={results}
+                    totalCount={totalCount}
+                    error={executionError}
+                    onRetry={() => void runScreen()}
+                    currencies={currencies}
+                    fields={fields}
+                />
 
             </Stack>
 
             <Dialog open={saveAsOpen} onClose={() => setSaveAsOpen(false)} fullWidth maxWidth="xs">
-                <DialogTitle>Save screen as</DialogTitle>
+                <DialogTitle>{saveAsSourceId ? 'Duplicate saved screen' : 'Save screen as'}</DialogTitle>
                 <DialogContent>
                     <TextField
                         autoFocus
                         margin="dense"
-                        label="New screen name"
+                        label="Screen name"
                         fullWidth
                         value={saveAsName}
                         onChange={(event) => setSaveAsName(event.target.value)}
+                        error={!!saveAsError}
                     />
                     {saveAsError && (
                         <Alert severity="error" sx={{ mt: 2 }}>
@@ -752,15 +1323,86 @@ export function ScreenerPage() {
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setSaveAsOpen(false)}>Cancel</Button>
-                    <Button onClick={saveAsScreen} disabled={!saveAsName.trim()} variant="contained">
-                        Save copy
+                    <Button
+                        onClick={() => void saveAsScreen()}
+                        disabled={
+                            !saveAsName.trim() ||
+                            createSavedScreen.isPending ||
+                            duplicateSavedScreen.isPending
+                        }
+                        variant="contained"
+                    >
+                        {saveAsSourceId ? 'Duplicate' : 'Save copy'}
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog
+                open={renameTarget !== null}
+                onClose={() => setRenameTarget(null)}
+                fullWidth
+                maxWidth="xs"
+            >
+                <DialogTitle>Rename saved screen</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        label="Screen name"
+                        fullWidth
+                        value={renameName}
+                        onChange={(event) => setRenameName(event.target.value)}
+                        error={!!renameError}
+                    />
+                    {renameError && (
+                        <Alert severity="error" sx={{ mt: 2 }}>
+                            {renameError}
+                        </Alert>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRenameTarget(null)}>Cancel</Button>
+                    <Button
+                        onClick={() => void saveRename()}
+                        disabled={!renameName.trim() || renameSavedScreen.isPending}
+                        variant="contained"
+                    >
+                        Rename
+                    </Button>
+                </DialogActions>
+            </Dialog>
+            <Dialog
+                open={deleteTarget !== null}
+                onClose={() => setDeleteTarget(null)}
+                aria-labelledby="delete-saved-screen-title"
+            >
+                <DialogTitle id="delete-saved-screen-title">Delete saved screen?</DialogTitle>
+                <DialogContent>
+                    This will permanently delete “{deleteTarget?.name}”.
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setDeleteTarget(null)}>Cancel</Button>
+                    <Button
+                        color="error"
+                        onClick={() => void confirmDeleteSavedScreen()}
+                        disabled={deleteSavedScreen.isPending}
+                    >
+                        Delete
                     </Button>
                 </DialogActions>
             </Dialog>
             <UnsavedChangesDialog
                 open={discardDialogOpen}
-                onCancel={() => setDiscardDialogOpen(false)}
-                onDiscard={() => resetScreen()}
+                onCancel={() => {
+                    setDiscardDialogOpen(false);
+                    setPendingLoadId(null);
+                }}
+                onDiscard={discardPendingScreenChanges}
+                message={
+                    pendingLoadId
+                        ? 'Loading another screen will discard your current changes.'
+                        : undefined
+                }
+                discardLabel={pendingLoadId ? 'Discard and load' : 'Discard changes'}
             />
             <Snackbar
                 open={!!notice}
@@ -772,12 +1414,17 @@ export function ScreenerPage() {
     );
 }
 
-function initialScreenDraft(name = 'Untitled screen') {
+function initialScreenDraft(name = 'Untitled screen'): ScreenDraftSnapshot {
     return {
+        id: null,
         name,
-        scope: { exchangeIds: [] as number[], currencyCodes: [] as string[] },
-        filters: [] as ScreenerFilterDraft[],
-        filterLogic: 'and' as const,
+        scope: {
+            exchangeIds: [],
+            currencyCodes: [],
+            marketCountryCodes: [],
+        },
+        filters: [],
+        filterLogic: 'and',
         sort: null,
     };
 }
@@ -786,20 +1433,24 @@ export function UnsavedChangesDialog({
     open,
     onCancel,
     onDiscard,
+    message = 'Your current screen has unsaved changes. Starting a new screen will discard them.',
+    discardLabel = 'Discard changes',
 }: {
     open: boolean;
     onCancel: () => void;
     onDiscard: () => void;
+    message?: string;
+    discardLabel?: string;
 }) {
     return (
         <Dialog open={open} onClose={onCancel} aria-labelledby="discard-screen-title">
             <DialogTitle id="discard-screen-title">Discard unsaved changes?</DialogTitle>
             <DialogContent>
-                Your current screen has unsaved changes. Starting a new screen will discard them.
+                {message}
             </DialogContent>
             <DialogActions>
                 <Button onClick={onCancel}>Keep editing</Button>
-                <Button color="error" onClick={onDiscard}>Discard changes</Button>
+                <Button color="error" onClick={onDiscard}>{discardLabel}</Button>
             </DialogActions>
         </Dialog>
     );

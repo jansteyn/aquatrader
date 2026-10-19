@@ -220,7 +220,7 @@ export async function screenerScreenerSavedIdName(
     request: IScreenerScreenerSavedIdNameRequest
 ) : Promise<ApiResult<any>> {
     const response = await fetch(`${baseUrl}/api/screener/saved/${request.id}/name`, {
-        method: "POST",
+        method: "PATCH",
         body: JSON.stringify(request)
     });
     return {
